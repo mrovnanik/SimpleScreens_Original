@@ -35,7 +35,7 @@ class MyAccountScreenTests extends Specification {
     def setupSpec() {
         ec = Moqui.getExecutionContext()
         // this is the user created in WorkPlanToCashBasicFlow
-        ec.user.loginUser("worker", "moqui1!", null)
+        ec.user.loginUser("worker", "moqui1!")
         screenTest = ec.screen.makeTest().baseScreenPath("apps/my")
 
         ec.entity.tempSetSequencedIdPrimary("mantle.party.communication.CommunicationEvent", 61000, 10)
@@ -49,6 +49,9 @@ class MyAccountScreenTests extends Specification {
         ec.entity.tempResetSequencedIdPrimary("mantle.party.communication.CommunicationEvent")
         ec.entity.tempResetSequencedIdPrimary("mantle.work.effort.WorkEffort")
         ec.destroy()
+
+        // destroy the framework, note if there are ever multiple test classes for this component this should move to a Suite class
+        Moqui.destroyActiveExecutionContextFactory()
     }
 
     def setup() {

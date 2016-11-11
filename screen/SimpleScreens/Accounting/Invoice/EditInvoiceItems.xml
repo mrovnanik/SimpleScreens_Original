@@ -33,7 +33,9 @@ along with this software (see the LICENSE.md file). If not, see
         <service-call name="mantle.account.InvoiceServices.get#InvoiceTotal" in-map="[invoiceId:invoiceId]" out-map="context"/>
         <entity-find entity-name="mantle.account.invoice.InvoiceItem" list="invoiceItemList">
             <econdition field-name="invoiceId"/></entity-find>
-        <set field="invoiceEditable" from="invoice.statusId in ['InvoiceInProcess', 'InvoiceIncoming', 'InvoiceReceived']"/>
+
+        <set field="editableStatusIds" from="new HashSet(['InvoiceInProcess', 'InvoiceIncoming', 'InvoiceReceived'])"/>
+        <set field="invoiceEditable" from="invoice.statusId in editableStatusIds"/>
 
         <entity-find entity-name="moqui.basic.Enumeration" list="itemTypeEnumList">
             <econdition field-name="enumTypeId" value="ItemType"/><order-by field-name="description"/></entity-find>
@@ -61,7 +63,7 @@ along with this software (see the LICENSE.md file). If not, see
             </container>
         </widgets></section>
 
-        <label text="Invoice Total: ${ec.l10n.formatCurrency(invoiceTotal, invoice.currencyUomId, 2)}"/>
+        <label text="Invoice Total: ${ec.l10n.formatCurrency(invoiceTotal, invoice.currencyUomId)}"/>
         <form-list name="EditInvoiceItems" list="invoiceItemList" transition="updateInvoiceItem" multi="true">
             <field name="invoiceId"><default-field><hidden/></default-field></field>
             <field name="invoiceItemSeqId"><default-field title="Item"><display/></default-field></field>
@@ -92,7 +94,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <conditional-field condition="invoiceEditable"><text-line size="8"/></conditional-field>
                 <default-field><display currency-unit-field="invoice.currencyUomId"/></default-field>
             </field>
-            <field name="total" entry-name="((quantity ?: 1) * (amount ?: 0))">
+            <field name="total" from="((quantity ?: 1) * (amount ?: 0))">
                 <default-field><display currency-unit-field="invoice.currencyUomId"/></default-field></field>
 
             <field name="deleteButton"><default-field title="">

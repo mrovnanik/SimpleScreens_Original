@@ -32,6 +32,8 @@ along with this software (see the LICENSE.md file). If not, see
     <transition name="cloneOrder"><service-call name="mantle.order.OrderServices.clone#Order"/>
         <default-response url="."/></transition>
 
+    <transition name="invoiceOrderPart"><service-call name="mantle.account.InvoiceServices.create#EntireOrderPartInvoice"/>
+        <default-response url="."/></transition>
     <transition name="shipOrderPart"><service-call name="mantle.shipment.ShipmentServices.create#OrderPartShipment"/>
         <default-response url="."/></transition>
     <transition name="addOrderPartToShipment"><service-call name="mantle.shipment.ShipmentServices.add#OrderPartToShipment"/>
@@ -120,9 +122,9 @@ along with this software (see the LICENSE.md file). If not, see
                         <container-dialog id="AddPartDialog" button-text="Add Part">
                             <form-single name="AddPartForm" transition="createOrderPart">
                                 <field name="orderId"><default-field><hidden/></default-field></field>
-                                <field name="vendorPartyId" entry-name="firstPartInfo.orderPart.vendorPartyId">
+                                <field name="vendorPartyId" from="firstPartInfo.orderPart.vendorPartyId">
                                     <default-field><hidden/></default-field></field>
-                                <field name="customerPartyId" entry-name="firstPartInfo.orderPart.customerPartyId">
+                                <field name="customerPartyId" from="firstPartInfo.orderPart.customerPartyId">
                                     <default-field><hidden/></default-field></field>
                                 <field name="facilityId"><default-field title="Facility"><drop-down>
                                     <entity-options key="${facilityId}" text="${facilityName} [${pseudoId}]">
@@ -157,24 +159,37 @@ along with this software (see the LICENSE.md file). If not, see
                             <display text="${statusItem.description}"/></default-field></field>
                         <field name="entryDate"><default-field title="Entry"><display/></default-field></field>
                         <field name="placedDate"><default-field title="Placed"><display/></default-field></field>
-                        <field name="orderName"><default-field title="Name"><text-line size="40"/></default-field></field>
+                        <field name="orderName">
+                            <conditional-field condition="orderEditable"><text-line size="40"/></conditional-field>
+                            <default-field title="Name"><display/></default-field>
+                        </field>
                         <field name="orderRevision"><default-field title="Revision"><display/></default-field></field>
-                        <field name="salesChannelEnumId"><default-field title="Channel">
+                        <field name="salesChannelEnumId">
+                            <conditional-field condition="orderEditable" title="Status">
                             <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
                                 <set field="enumTypeId" value="SalesChannel"/><set field="allowEmpty" value="true"/>
                                 <set field="style" value=" "/></widget-template-include>
-                        </default-field></field>
+                            </conditional-field>
+                            <default-field title="Channel">
+                                <display-entity entity-name="moqui.basic.Enumeration"/>
+                            </default-field>
+                        </field>
                         <field name="externalId"><default-field><display/></default-field></field>
                         <field name="externalRevision"><default-field title="Ext Rev"><display/></default-field></field>
-                        <field name="systemMessageRemoteId"><default-field title="Message Remote">
-                            <drop-down allow-empty="true">
-                                <entity-options key="${systemMessageRemoteId}" text="${description}">
-                                    <entity-find entity-name="moqui.service.message.SystemMessageRemote">
-                                        <order-by field-name="description"/></entity-find></entity-options>
-                            </drop-down>
-                        </default-field></field>
-                        <field name="submitButton"><default-field title="Update Header"><submit/></default-field></field>
-
+                        <field name="systemMessageRemoteId">
+                            <conditional-field condition="orderEditable">
+                                <drop-down allow-empty="true">
+                                    <entity-options key="${systemMessageRemoteId}" text="${description}">
+                                        <entity-find entity-name="moqui.service.message.SystemMessageRemote">
+                                            <order-by field-name="description"/></entity-find></entity-options>
+                                </drop-down>
+                            </conditional-field>
+                            <default-field title="Message Remote"><display-entity entity-name="moqui.service.message.SystemMessageRemote" key-field-name="systemMessageRemoteId"/></default-field>
+                        </field>
+                        <field name="submitButton">
+                            <conditional-field condition="orderEditable" title="Update Header"><submit/></conditional-field>
+                            <default-field title="Update Header"></default-field>
+                        </field>
                         <field-layout>
                             <field-row><field-ref name="statusId"/><field-ref name="orderRevision"/></field-row>
                             <field-row><field-ref name="entryDate"/><field-ref name="placedDate"/></field-row>
@@ -203,12 +218,12 @@ along with this software (see the LICENSE.md file). If not, see
                             <box-body>
                                 <section-iterate name="NoteIterateSection" list="orderNoteList" entry="note">
                                     <actions>
-                                        <entity-find-one entity-name="mantle.party.PersonAndUserAccount" value-field="paua">
+                                        <entity-find-one entity-name="mantle.party.PersonWithUserAccount" value-field="paua">
                                             <field-map field-name="userId" from="note.userId"/></entity-find-one>
                                     </actions>
                                     <widgets>
                                         <label text="By ${paua?.firstName?:''} ${paua?.lastName?:''} (${paua?.username ?: note.userId}) at ${ec.l10n.format(note.noteDate, 'yyyy-MM-dd HH:mm')}" type="strong"/>
-                                        <section name="UpdateNoteSection" condition="note.userId == ec.user.userId">
+                                        <section name="UpdateNoteSection" condition="note.userId == ec.user.userId &amp;&amp; orderEditable">
                                             <widgets>
                                                 <container-dialog id="UpdateNoteContainer" button-text="Edit Note">
                                                     <form-single name="UpdateNoteForm" transition="updateNote" map="note">
@@ -247,7 +262,7 @@ along with this software (see the LICENSE.md file). If not, see
                                 <box-body>
                                     <section-iterate name="ContentIterateSection" list="contentList" entry="content">
                                         <actions>
-                                            <entity-find-one entity-name="mantle.party.PersonAndUserAccount" value-field="paua">
+                                            <entity-find-one entity-name="mantle.party.PersonWithUserAccount" value-field="paua">
                                                 <field-map field-name="userId" from="content.userId"/></entity-find-one>
                                         </actions>
                                         <widgets>
@@ -255,15 +270,17 @@ along with this software (see the LICENSE.md file). If not, see
                                                 <link url="downloadContent" condition="content.contentLocation"
                                                         parameter-map="[orderContentId:content.orderContentId]"
                                                         text="Download ${content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)}"/>
-                                                <container-dialog id="UpdateContentContainer" button-text="Edit Attachment">
-                                                    <form-single name="UpdateContentForm" transition="updateContent" map="content">
-                                                        <field name="orderContentId"><default-field><hidden/></default-field></field>
-                                                        <field name="orderId"><default-field><hidden/></default-field></field>
-                                                        <field name="contentFile"><default-field><file/></default-field></field>
-                                                        <field name="description"><default-field><text-line size="60"/></default-field></field>
-                                                        <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
-                                                    </form-single>
-                                                </container-dialog>
+                                                <section name="UpdateContentContainerSection" condition="orderEditable"><widgets>
+                                                    <container-dialog id="UpdateContentContainer" button-text="Edit Attachment">
+                                                        <form-single name="UpdateContentForm" transition="updateContent" map="content">
+                                                            <field name="orderContentId"><default-field><hidden/></default-field></field>
+                                                            <field name="orderId"><default-field><hidden/></default-field></field>
+                                                            <field name="contentFile"><default-field><file/></default-field></field>
+                                                            <field name="description"><default-field><text-line size="60"/></default-field></field>
+                                                            <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
+                                                        </form-single>
+                                                    </container-dialog>
+                                                </widgets></section>
                                                 <container><label text="By ${paua?.firstName?:''} ${paua?.lastName?:''} (${paua?.username ?: content.userId}) at ${ec.l10n.format(content.contentDate, 'yyyy-MM-dd HH:mm')}"/></container>
                                                 <label text="${content.description ?: 'No Description'}" type="p"/>
                                             </container>
@@ -303,44 +320,46 @@ along with this software (see the LICENSE.md file). If not, see
                 <container style="row shaded-area">
                     <container style="col-lg-6">
                         <container><label text="Order Part ${orderPartInfo.orderPart.orderPartSeqId}" type="strong"/></container>
-                        <container-dialog id="EditPartDialog" button-text="Edit Part ${orderPartInfo.orderPart.orderPartSeqId}">
-                            <form-single name="EditPartForm" transition="updateOrderPart" map="orderPartInfo.orderPart">
-                                <field name="orderId"><default-field><hidden/></default-field></field>
-                                <field name="orderPartSeqId"><default-field><hidden/></default-field></field>
-                                <field name="facilityId"><default-field title="Facility"><drop-down>
-                                    <entity-options key="${facilityId}" text="${facilityName} [${pseudoId}]">
-                                        <entity-find entity-name="mantle.facility.Facility" list="facilityList">
-                                            <econdition field-name="facilityTypeEnumId" value="FcTpWarehouse"/>
-                                            <econdition field-name="ownerPartyId" from="orderPartInfo.orderPart.vendorPartyId"
-                                                    ignore="!orderPartInfo.isVendorInternalOrg"/>
-                                            <econdition field-name="ownerPartyId" from="orderPartInfo.orderPart.customerPartyId"
-                                                    ignore="orderPartInfo.isVendorInternalOrg"/>
-                                            <order-by field-name="facilityName"/>
-                                        </entity-find></entity-options>
-                                </drop-down></default-field></field>
-                                <field name="shipBeforeDate"><default-field><date-time/></default-field></field>
-                                <field name="estimatedDeliveryDate"><default-field title="Delivery Date"><date-time/></default-field></field>
-                                <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
-                            </form-single>
-                        </container-dialog>
-                        <container-dialog id="AddPartPartyDialog" button-text="Add Party">
-                            <form-single name="CreateOrderPartParty" transition="createOrderPartParty" map="orderPartInfo.orderPart">
-                                <field name="orderId"><default-field><hidden/></default-field></field>
-                                <field name="orderPartSeqId"><default-field><hidden/></default-field></field>
-                                <field name="partyId"><default-field title="Party">
-                                    <text-line ac-transition="getPartyList" ac-min-length="2" size="60"/>
-                                </default-field></field>
-                                <field name="roleTypeId"><default-field title="Role">
-                                    <drop-down>
-                                        <entity-options key="${roleTypeId}" text="${description}">
-                                            <entity-find entity-name="mantle.party.RoleGroupMemberAndType" cache="true">
-                                                <econdition field-name="roleGroupEnumId" value="RgpOrder"/>
-                                                <order-by field-name="description"/></entity-find></entity-options>
-                                    </drop-down>
-                                </default-field></field>
-                                <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
-                            </form-single>
-                        </container-dialog>
+                        <section name="EditPartSection" condition="orderPartInfo.partEditable"><widgets>
+                            <container-dialog id="EditPartDialog" button-text="Edit Part ${orderPartInfo.orderPart.orderPartSeqId}">
+                                <form-single name="EditPartForm" transition="updateOrderPart" map="orderPartInfo.orderPart">
+                                    <field name="orderId"><default-field><hidden/></default-field></field>
+                                    <field name="orderPartSeqId"><default-field><hidden/></default-field></field>
+                                    <field name="facilityId"><default-field title="Facility"><drop-down>
+                                        <entity-options key="${facilityId}" text="${facilityName} [${pseudoId}]">
+                                            <entity-find entity-name="mantle.facility.Facility" list="facilityList">
+                                                <econdition field-name="facilityTypeEnumId" value="FcTpWarehouse"/>
+                                                <econdition field-name="ownerPartyId" from="orderPartInfo.orderPart.vendorPartyId"
+                                                        ignore="!orderPartInfo.isVendorInternalOrg"/>
+                                                <econdition field-name="ownerPartyId" from="orderPartInfo.orderPart.customerPartyId"
+                                                        ignore="orderPartInfo.isVendorInternalOrg"/>
+                                                <order-by field-name="facilityName"/>
+                                            </entity-find></entity-options>
+                                    </drop-down></default-field></field>
+                                    <field name="shipBeforeDate"><default-field><date-time/></default-field></field>
+                                    <field name="estimatedDeliveryDate"><default-field title="Delivery Date"><date-time/></default-field></field>
+                                    <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
+                                </form-single>
+                            </container-dialog>
+                            <container-dialog id="AddPartPartyDialog" button-text="Add Party">
+                                <form-single name="CreateOrderPartParty" transition="createOrderPartParty" map="orderPartInfo.orderPart">
+                                    <field name="orderId"><default-field><hidden/></default-field></field>
+                                    <field name="orderPartSeqId"><default-field><hidden/></default-field></field>
+                                    <field name="partyId"><default-field title="Party">
+                                        <text-line ac-transition="getPartyList" ac-min-length="2" size="60"/>
+                                    </default-field></field>
+                                    <field name="roleTypeId"><default-field title="Role">
+                                        <drop-down>
+                                            <entity-options key="${roleTypeId}" text="${description}">
+                                                <entity-find entity-name="mantle.party.RoleGroupMemberAndType" cache="true">
+                                                    <econdition field-name="roleGroupEnumId" value="RgpOrder"/>
+                                                    <order-by field-name="description"/></entity-find></entity-options>
+                                        </drop-down>
+                                    </default-field></field>
+                                    <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
+                                </form-single>
+                            </container-dialog>
+                        </widgets></section>
 
                         <link url="completeOrderPart" text="Complete Part" link-type="hidden-form"
                                 parameter-map="[orderPartSeqId:orderPartInfo.orderPart.orderPartSeqId]"
@@ -372,7 +391,7 @@ along with this software (see the LICENSE.md file). If not, see
                                         <container-dialog id="AddOrderPartToShipmentDialog" button-text="Add Part to Shipment">
                                             <form-single name="AddOrderPartToShipmentForm" transition="addOrderPartToShipment">
                                                 <field name="orderId"><default-field><hidden/></default-field></field>
-                                                <field name="orderPartSeqId" entry-name="orderPartInfo.orderPart.orderPartSeqId">
+                                                <field name="orderPartSeqId" from="orderPartInfo.orderPart.orderPartSeqId">
                                                     <default-field><hidden/></default-field></field>
                                                 <field name="shipmentId"><default-field title="Shipment"><drop-down>
                                                     <list-options list="ssfsList" key="${shipmentId}" text="${shipmentId}"/>
@@ -388,7 +407,7 @@ along with this software (see the LICENSE.md file). If not, see
                             <link url="shipmentDetail" text="Shipment #${shipmentId}" link-type="anchor-button"/>
                         </widgets></section-iterate>
 
-                        <label text="Part Total ${ec.l10n.formatCurrency(orderPartInfo.orderPart.partTotal ?: 0, orderHeader?.currencyUomId, 2)}" type="p"/>
+                        <label text="Part Total ${ec.l10n.formatCurrency(orderPartInfo.orderPart.partTotal ?: 0, orderHeader?.currencyUomId)}" type="p"/>
                         <container>
                             <label text="Vendor: " type="strong"/>
                             <link url="editVendor" text="${orderPartInfo.vendorDetail.organizationName?:''}${orderPartInfo.vendorDetail.firstName?:''} ${orderPartInfo.vendorDetail.lastName?:''} [${orderPartInfo.vendorDetail.pseudoId}]"
@@ -428,11 +447,11 @@ along with this software (see the LICENSE.md file). If not, see
                     <container style="col-lg-6">
                         <section name="PaymentInfoSection"><widgets>
                             <section name="PaymentNotEnoughSection" condition="orderPartInfo.paymentsTotal &lt; orderPartInfo.orderPart.partTotal">
-                                <widgets><label text="Payments total (${ec.l10n.formatCurrency(orderPartInfo.paymentsTotal ?: 0, orderHeader?.currencyUomId, 2)}) is less than order part total (${ec.l10n.formatCurrency(orderPartInfo.orderPart.partTotal ?: 0, orderHeader?.currencyUomId, 2)})" style="text-danger" type="p"/></widgets></section>
+                                <widgets><label text="Payments total (${ec.l10n.formatCurrency(orderPartInfo.paymentsTotal ?: 0, orderHeader?.currencyUomId)}) is less than order part total (${ec.l10n.formatCurrency(orderPartInfo.orderPart.partTotal ?: 0, orderHeader?.currencyUomId)})" style="text-danger" type="p"/></widgets></section>
                             <container-dialog id="AddPaymentInfo" button-text="Add Payment">
                                 <form-single name="AddPaymentForm" transition="addOrderPartPayment">
                                     <field name="orderId"><default-field><hidden/></default-field></field>
-                                    <field name="orderPartSeqId" entry-name="orderPartInfo.orderPart.orderPartSeqId"><default-field><hidden/></default-field></field>
+                                    <field name="orderPartSeqId" from="orderPartInfo.orderPart.orderPartSeqId"><default-field><hidden/></default-field></field>
 
                                     <field name="paymentInstrumentEnumId"><default-field title="Instrument">
                                         <drop-down allow-empty="true" no-current-selected-key="PiCompanyCheck">
@@ -456,16 +475,16 @@ along with this software (see the LICENSE.md file). If not, see
                                     <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
                                 </form-single>
                             </container-dialog>
-                            <section-iterate name="payment-info" list="orderPartInfo.partPaymentInfoList" entry="partPaymentInfo">
+                            <section-iterate name="PaymentInfoSection" list="orderPartInfo.partPaymentInfoList" entry="partPaymentInfo">
                                 <actions><set field="methodInfo" from="partPaymentInfo"/></actions>
                                 <widgets>
                                     <container>
-                                        <label text="${partPaymentInfo.paymentMethodTypeEnum?.description?:''} ${ec.l10n.formatCurrency(partPaymentInfo.partPayment.amount, partPaymentInfo.partPayment.amountUomId, 2)}" type="strong"/>
+                                        <label text="${partPaymentInfo.paymentMethodTypeEnum?.description?:''} ${ec.l10n.formatCurrency(partPaymentInfo.partPayment.amount, partPaymentInfo.partPayment.amountUomId)}" type="strong"/>
                                         <container-dialog id="UpdatePaymentDialog" button-text="Update">
                                             <form-single name="UpdatePaymentForm" transition="updatePayment"
                                                     map="partPaymentInfo.partPayment" extends="AddPaymentForm">
                                                 <field name="paymentId"><default-field><hidden/></default-field></field>
-                                                <field name="amount" entry-name=""><default-field><text-line size="10" format="0.00"/></default-field></field>
+                                                <field name="amount" from=""><default-field><text-line size="10" format="0.00"/></default-field></field>
                                                 <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
                                             </form-single>
                                         </container-dialog>
@@ -508,7 +527,7 @@ along with this software (see the LICENSE.md file). If not, see
 
                         <form-single name="SetOrderInfoForm" transition="setOrderBillingShippingInfo">
                             <field name="orderId"><default-field><hidden/></default-field></field>
-                            <field name="orderPartSeqId" entry-name="orderPartInfo.orderPart.orderPartSeqId">
+                            <field name="orderPartSeqId" from="orderPartInfo.orderPart.orderPartSeqId">
                                 <default-field><hidden/></default-field></field>
                             <field name="paymentMethodId"><default-field><hidden/></default-field></field>
                             <field name="shippingPostalContactMechId"><default-field><hidden/></default-field></field>
@@ -517,7 +536,7 @@ along with this software (see the LICENSE.md file). If not, see
                             <field name="carrierAndShipmentMethod"><default-field title="Shipment Method">
                                 <drop-down no-current-selected-key="${orderPart.carrierPartyId ? orderPart.carrierPartyId + ':' + orderPart.shipmentMethodEnumId : ''}">
                                     <list-options list="shippingOptions" key="${carrierPartyId}:${shipmentMethodEnumId}"
-                                            text="${carrierPartyId == '_NA_' ? '' : (carrierName + ' - ') }${shipmentMethodDescription} ${shippingTotal != null ? ec.l10n.formatCurrency(shippingTotal, orderHeader.currencyUomId, 2) : ''}"/>
+                                            text="${carrierPartyId == '_NA_' ? '' : (carrierName + ' - ') }${shipmentMethodDescription} ${shippingTotal != null ? ec.l10n.formatCurrency(shippingTotal, orderHeader.currencyUomId) : ''}"/>
                                 </drop-down>
                             </default-field></field>
                             <!--
@@ -544,59 +563,61 @@ along with this software (see the LICENSE.md file). If not, see
                     </container>
                 </container>
 
-                <container-dialog id="AddProductItemContainer" button-text="Add Product Item">
-                    <form-single name="AddProductItemForm" transition="addProductItem">
-                        <field name="orderId"><default-field><hidden/></default-field></field>
-                        <field name="orderPartSeqId" entry-name="orderPartInfo.orderPart.orderPartSeqId"><default-field><hidden/></default-field></field>
+                <section name="AddItemsSection" condition="orderPartInfo.partEditable"><widgets>
+                    <container-dialog id="AddProductItemContainer" button-text="Add Product Item">
+                        <form-single name="AddProductItemForm" transition="addProductItem">
+                            <field name="orderId"><default-field><hidden/></default-field></field>
+                            <field name="orderPartSeqId" from="orderPartInfo.orderPart.orderPartSeqId"><default-field><hidden/></default-field></field>
 
-                        <field name="productId"><default-field title="Product">
-                            <text-line ac-transition="getProductList" ac-min-length="2" size="50"/>
-                        </default-field></field>
-                        <!-- <field name="itemDescription"><default-field><text-line size="60"/></default-field></field> -->
-                        <field name="itemTypeEnumId"><default-field title="Item Type">
-                            <drop-down no-current-selected-key="ItemInventory">
-                                <option key="ItemProduct" text="Sales - Product"/>
-                                <option key="ItemInventory" text="Inventory"/>
-                                <option key="ItemAsset" text="Fixed Asset"/>
-                                <option key="ItemExpSupplies" text="Expense - Supplies"/>
-                            </drop-down>
-                        </default-field></field>
-                        <field name="quantity"><default-field><text-line size="8"/></default-field></field>
-                        <field name="unitAmount"><default-field title="Price"><text-line size="10"/></default-field></field>
-                        <field name="requiredByDate" entry-name="orderPartInfo.orderPart.shipBeforeDate"><default-field><date-time format="yyyy-MM-dd HH:mm"/></default-field></field>
-                        
-                        <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
-                    </form-single>
-                </container-dialog>
-                <container-dialog id="AddOtherItemContainer" button-text="Add Other Item">
-                    <form-single name="AddOtherItemForm" transition="createItem">
-                        <field name="orderId"><default-field><hidden/></default-field></field>
-                        <field name="orderPartSeqId" entry-name="orderPartInfo.orderPart.orderPartSeqId"><default-field><hidden/></default-field></field>
+                            <field name="productId"><default-field title="Product">
+                                <text-line ac-transition="getProductList" ac-min-length="2" size="50"/>
+                            </default-field></field>
+                            <!-- <field name="itemDescription"><default-field><text-line size="60"/></default-field></field> -->
+                            <field name="itemTypeEnumId"><default-field title="Item Type">
+                                <drop-down no-current-selected-key="ItemInventory">
+                                    <option key="ItemProduct" text="Sales - Product"/>
+                                    <option key="ItemInventory" text="Inventory"/>
+                                    <option key="ItemAsset" text="Fixed Asset"/>
+                                    <option key="ItemExpSupplies" text="Expense - Supplies"/>
+                                </drop-down>
+                            </default-field></field>
+                            <field name="quantity"><default-field><text-line size="8"/></default-field></field>
+                            <field name="unitAmount"><default-field title="Price"><text-line size="10"/></default-field></field>
+                            <field name="requiredByDate" from="orderPartInfo.orderPart.shipBeforeDate"><default-field><date-time format="yyyy-MM-dd HH:mm"/></default-field></field>
 
-                        <field name="parentItemSeqId"><default-field title="Parent Item">
-                            <drop-down allow-empty="true">
-                                <list-options list="orderPartInfo.partNoParentOrderItemList" key="${orderItemSeqId}" text="${orderItemSeqId} - ${itemDescription}"/>
-                            </drop-down>
-                        </default-field></field>
-                        <field name="itemTypeEnumId"><default-field title="Item Type">
-                            <drop-down no-current-selected-key="ItemExpense">
-                                <entity-options key="${enumId}" text="${description}">
-                                    <entity-find entity-name="moqui.basic.Enumeration">
-                                        <!-- TODO: based on order type (vendor org internal?) or in separate dialogs limit item types -->
-                                        <econdition field-name="parentEnumId" operator="in" value="ItemPurchase,ItemExpense,ItemSales"/>
-                                        <order-by field-name="description"/>
-                                    </entity-find>
-                                </entity-options>
-                            </drop-down>
-                        </default-field></field>
-                        <field name="itemDescription"><default-field><text-line size="60"/></default-field></field>
-                        <field name="quantity"><default-field><text-line size="8" default-value="1"/></default-field></field>
-                        <field name="unitAmount"><default-field title="Price"><text-line size="10"/></default-field></field>
-                        <field name="requiredByDate"><default-field><date-time format="yyyy-MM-dd HH:mm"/></default-field></field>
+                            <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
+                        </form-single>
+                    </container-dialog>
+                    <container-dialog id="AddOtherItemContainer" button-text="Add Other Item">
+                        <form-single name="AddOtherItemForm" transition="createItem">
+                            <field name="orderId"><default-field><hidden/></default-field></field>
+                            <field name="orderPartSeqId" from="orderPartInfo.orderPart.orderPartSeqId"><default-field><hidden/></default-field></field>
 
-                        <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
-                    </form-single>
-                </container-dialog>
+                            <field name="parentItemSeqId"><default-field title="Parent Item">
+                                <drop-down allow-empty="true">
+                                    <list-options list="orderPartInfo.partNoParentOrderItemList" key="${orderItemSeqId}" text="${orderItemSeqId} - ${itemDescription}"/>
+                                </drop-down>
+                            </default-field></field>
+                            <field name="itemTypeEnumId"><default-field title="Item Type">
+                                <drop-down no-current-selected-key="ItemExpense">
+                                    <entity-options key="${enumId}" text="${description}">
+                                        <entity-find entity-name="moqui.basic.Enumeration">
+                                            <!-- TODO: based on order type (vendor org internal?) or in separate dialogs limit item types -->
+                                            <econdition field-name="parentEnumId" operator="in" value="ItemPurchase,ItemExpense,ItemSales"/>
+                                            <order-by field-name="description"/>
+                                        </entity-find>
+                                    </entity-options>
+                                </drop-down>
+                            </default-field></field>
+                            <field name="itemDescription"><default-field><text-line size="60"/></default-field></field>
+                            <field name="quantity"><default-field><text-line size="8" default-value="1"/></default-field></field>
+                            <field name="unitAmount"><default-field title="Price"><text-line size="10"/></default-field></field>
+                            <field name="requiredByDate"><default-field><date-time format="yyyy-MM-dd HH:mm"/></default-field></field>
+
+                            <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
+                        </form-single>
+                    </container-dialog>
+                </widgets></section>
 
                 <form-list name="OrderItems" list="orderPartInfo.partOrderItemList" list-entry="orderItem" transition="updateItem">
                     <row-actions>
@@ -615,38 +636,54 @@ along with this software (see the LICENSE.md file). If not, see
                     <field name="parentItemSeqId">
                         <conditional-field condition="orderItem.itemTypeEnumId in productItemTypes || orderItemWithChildrenSet.contains(orderItem.orderItemSeqId)">
                             <display text="N/A"/></conditional-field>
-                        <default-field title="Parent Item"><drop-down allow-empty="true">
-                                <list-options list="applicableParentItems" key="${orderItemSeqId}"
-                                        text="${orderItemSeqId}"/>
-                        </drop-down></default-field>
+                        <conditional-field condition="orderPartInfo.partEditable" title="Parent Item"><drop-down allow-empty="true">
+                                <list-options list="applicableParentItems" key="${orderItemSeqId}" text="${orderItemSeqId}"/>
+                            </drop-down></conditional-field>
+                        <default-field title="Parent Item"><display/></default-field>
                     </field>
-                    <field name="orderPartSeqId"><default-field title="Order Part">
-                        <drop-down current="selected"><list-options list="orderPartList" key="${orderPartSeqId}" text="${orderPartSeqId}"/></drop-down>
-                    </default-field></field>
+                    <field name="orderPartSeqId">
+                        <conditional-field condition="orderPartInfo.partEditable">
+                            <drop-down current="selected"><list-options list="orderPartList" key="${orderPartSeqId}" text="${orderPartSeqId}"/></drop-down></conditional-field>
+                        <default-field title="Order Part"><display/></default-field></field>
 
-                    <field name="itemTypeEnumId"><default-field title="Type"><drop-down no-current-selected-key="ItemInventory">
-                        <entity-options key="${enumId}" text="${description}"><entity-find entity-name="moqui.basic.Enumeration">
-                            <econdition field-name="enumTypeId" value="ItemType"/><order-by field-name="description"/>
-                        </entity-find></entity-options></drop-down>
-                    </default-field></field>
+                    <field name="itemTypeEnumId">
+                        <conditional-field condition="orderPartInfo.partEditable" title="Type">
+                            <drop-down no-current-selected-key="ItemInventory">
+                                <entity-options key="${enumId}" text="${description}"><entity-find entity-name="moqui.basic.Enumeration">
+                                    <econdition field-name="enumTypeId" value="ItemType"/><order-by field-name="description"/>
+                                </entity-find></entity-options></drop-down>
+                        </conditional-field>
+                        <default-field title="Type">
+                           <display-entity entity-name="moqui.basic.Enumeration"/>
+                        </default-field>
+                    </field>
                     <field name="productId">
-                        <conditional-field condition="orderItem.itemTypeEnumId in productItemTypes">
+                        <conditional-field
+                                condition="orderItem.itemTypeEnumId in productItemTypes &amp;&amp; orderPartInfo.partEditable">
                             <text-line ac-transition="getProductList" ac-min-length="2" size="35"/>
                             <link url="editProduct" text="ProductNameTemplate" entity-name="mantle.product.Product"
                                     link-type="anchor" condition="productId"/>
                         </conditional-field>
                         <default-field title="Product">
                             <link url="editProduct" text="ProductNameTemplate" entity-name="mantle.product.Product"
-                                    link-type="anchor" condition="productId"/>
+                                  link-type="anchor" condition="productId"/>
                         </default-field>
                     </field>
-                    <field name="otherPartyProductId"><default-field><text-line size="25"/></default-field></field>
-                    <field name="itemDescription"><default-field title="Description">
-                        <text-line size="40"/></default-field></field>
-                    <field name="comments"><default-field><text-line size="40"/></default-field></field>
-                    <field name="requiredByDate"><default-field><date-time/></default-field></field>
-                    <field name="unitAmount"><default-field title="Price"><text-line size="8" format="#0.00"/></default-field></field>
-                    <field name="quantity"><default-field><text-line size="5"/></default-field></field>
+                    <field name="otherPartyProductId">
+                        <conditional-field condition="orderPartInfo.partEditable"><text-line size="25"/></conditional-field>
+                        <default-field><display/></default-field></field>
+                    <field name="itemDescription">
+                        <conditional-field condition="orderPartInfo.partEditable" title="Description"><text-line size="40"/></conditional-field>
+                        <default-field title="Description"><display/></default-field></field>
+                    <field name="comments"><conditional-field condition="orderPartInfo.partEditable"><text-line size="40"/></conditional-field>
+                        <default-field><display/></default-field></field>
+                    <field name="requiredByDate"><conditional-field condition="orderPartInfo.partEditable"><date-time/></conditional-field>
+                        <default-field><display/></default-field></field>
+                    <field name="unitAmount"><conditional-field condition="orderPartInfo.partEditable" title="Price">
+                        <text-line size="8" format="#0.00"/></conditional-field>
+                        <default-field><display currency-unit-field="orderHeader.currencyUomId"/></default-field></field>
+                    <field name="quantity"><conditional-field condition="orderPartInfo.partEditable"><text-line size="5"/></conditional-field>
+                        <default-field><display/></default-field></field>
 
                     <field name="assetReservations">
                         <conditional-field condition="orderItem.productId">
@@ -660,16 +697,18 @@ along with this software (see the LICENSE.md file). If not, see
                         <default-field><display text=" "/></default-field>
                     </field>
 
-                    <field name="itemTotal" entry-name="orderItemTotalOut.itemTotal"><default-field>
+                    <field name="itemTotal" from="orderItemTotalOut.itemTotal"><default-field>
                         <display currency-unit-field="orderHeader.currencyUomId"/></default-field></field>
-                    <field name="itemPlusChildrenTotal" entry-name="orderItemTotalOut.itemPlusChildrenTotal">
+                    <field name="itemPlusChildrenTotal" from="orderItemTotalOut.itemPlusChildrenTotal">
                         <conditional-field condition="productId"><display currency-unit-field="orderHeader.currencyUomId"/></conditional-field>
                         <default-field title="With Children"><display text=""/></default-field>
                     </field>
 
-                    <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
-                    <field name="deleteLink"><default-field title="">
-                        <link url="deleteItem" text="Delete"/></default-field></field>
+                    <field name="submitButton"><conditional-field condition="orderPartInfo.partEditable" title="Update"><submit/></conditional-field>
+                        <default-field/></field>
+                    <field name="deleteLink"><conditional-field condition="orderPartInfo.partEditable" title="">
+                        <link url="deleteItem" text="Delete"/></conditional-field>
+                        <default-field/></field>
 
                     <form-list-column><field-ref name="orderItemSeqId"/></form-list-column>
                     <form-list-column><field-ref name="orderPartSeqId"/><field-ref name="parentItemSeqId"/></form-list-column>

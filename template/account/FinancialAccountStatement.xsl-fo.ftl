@@ -37,12 +37,12 @@ along with this software (see the LICENSE.md file). If not, see
 
         <fo:flow flow-name="xsl-region-body">
 
-            <fo:block font-size="14pt" text-align="center" margin-bottom="0">${Static["org.moqui.impl.StupidUtilities"].encodeForXmlAttribute(organizationDetail.organizationName!"", false)}</fo:block>
+            <fo:block font-size="14pt" text-align="center" margin-bottom="0">${Static["org.moqui.util.StringUtilities"].encodeForXmlAttribute(organizationDetail.organizationName!"", false)}</fo:block>
             <fo:block font-size="13pt" text-align="center" margin-bottom="0.1in">Account Statement</fo:block>
 
             <fo:table table-layout="fixed" width="7.5in"><fo:table-body><fo:table-row font-size="10pt">
                 <fo:table-cell padding="0.05in" width="3in">
-                    <fo:block text-align="left">${Static["org.moqui.impl.StupidUtilities"].encodeForXmlAttribute(ownerDetail.organizationName!"", false)}${ownerDetail.firstName!""} ${ownerDetail.lastName!""}</fo:block>
+                    <fo:block text-align="left">${Static["org.moqui.util.StringUtilities"].encodeForXmlAttribute(ownerDetail.organizationName!"", false)}${ownerDetail.firstName!""} ${ownerDetail.lastName!""}</fo:block>
                 </fo:table-cell>
                 <fo:table-cell padding="0.05in" width="2in">
                     <fo:block text-align="left" font-weight="bold">Account</fo:block>
@@ -54,9 +54,9 @@ along with this software (see the LICENSE.md file). If not, see
                 </fo:table-cell>
                 <fo:table-cell padding="0.05in" width="2in">
                     <fo:block text-align="left" font-weight="bold">Begining Balance</fo:block>
-                    <fo:block text-align="left">${ec.l10n.formatCurrency(beginningBalance, financialAccount.currencyUomId, 2)}</fo:block>
+                    <fo:block text-align="left">${ec.l10n.formatCurrency(beginningBalance, financialAccount.currencyUomId)}</fo:block>
                     <fo:block text-align="left" font-weight="bold">Ending Balance</fo:block>
-                    <fo:block text-align="left">${ec.l10n.formatCurrency(endingBalance, financialAccount.currencyUomId, 2)}</fo:block>
+                    <fo:block text-align="left">${ec.l10n.formatCurrency(endingBalance, financialAccount.currencyUomId)}</fo:block>
                 </fo:table-cell>
             </fo:table-row></fo:table-body></fo:table>
 
@@ -77,8 +77,8 @@ along with this software (see the LICENSE.md file). If not, see
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${ec.l10n.format(trans.transactionDate, dateFormat)}</fo:block></fo:table-cell>
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${trans["FinancialAccountTransReason#moqui.basic.Enumeration"].description}</fo:block></fo:table-cell>
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${trans.comments}</fo:block></fo:table-cell>
-                            <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(trans.amount, financialAccount.currencyUomId, 2)}<#if (trans.amount >= 0)>&#8199;</#if></fo:block></fo:table-cell>
-                            <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(trans.postBalance, financialAccount.currencyUomId, 2)}<#if (trans.postBalance >= 0)>&#8199;</#if></fo:block></fo:table-cell>
+                            <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(trans.amount, financialAccount.currencyUomId)}<#if (trans.amount >= 0)>&#8199;</#if></fo:block></fo:table-cell>
+                            <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(trans.postBalance, financialAccount.currencyUomId)}<#if (trans.postBalance >= 0)>&#8199;</#if></fo:block></fo:table-cell>
                         </fo:table-row>
                     </#list>
                 </fo:table-body>

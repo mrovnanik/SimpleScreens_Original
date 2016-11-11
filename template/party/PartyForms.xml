@@ -36,7 +36,7 @@ along with this software (see the LICENSE.md file). If not, see
                     </script>
                 </then>
                 <else>
-                    <entity-find entity-name="mantle.party.PartyDetailAndRole" list="partyList" limit="20">
+                    <entity-find entity-name="mantle.party.PartyDetailAndRole" list="partyList" limit="20" distinct="true">
                         <econdition field-name="roleTypeId" operator="in" ignore-if-empty="true"/>
                         <econdition field-name="disabled" value="N" or-null="true"/>
                         <econditions combine="or">
@@ -46,11 +46,8 @@ along with this software (see the LICENSE.md file). If not, see
                             <econdition field-name="lastName" operator="like" value="%${term}%" ignore-case="true"/>
                             <econdition field-name="organizationName" operator="like" value="%${term}%" ignore-case="true"/>
                         </econditions>
-                        <select-field field-name="partyId"/><select-field field-name="pseudoId"/>
-                        <select-field field-name="organizationName"/>
-                        <select-field field-name="firstName"/><select-field field-name="lastName"/>
-                        <order-by field-name="^firstName"/><order-by field-name="^lastName"/>
-                        <order-by field-name="^organizationName"/>
+                        <select-field field-name="partyId,pseudoId,organizationName,firstName,lastName"/>
+                        <order-by field-name="^firstName,^lastName,^organizationName"/>
                     </entity-find>
                     <script>
                         def outList = []
@@ -86,12 +83,12 @@ along with this software (see the LICENSE.md file). If not, see
         <service-call name="mantle.party.ContactServices.get#PartyContactInfo" out-map="billingContactInfo"
                 in-map="[partyId:partyId, postalContactMechPurposeId:'PostalBilling',
                     telecomContactMechPurposeId:'PhoneBilling', emailContactMechPurposeId:'EmailBilling']"/>
-        <set field="contactInfoFlat" from="StupidUtilities.flattenNestedMap(billingContactInfo)"/>
+        <set field="contactInfoFlat" from="flattenNestedMap(billingContactInfo)"/>
 
         <!-- example code for PaymentMethodInfo form -->
         <service-call name="mantle.account.PaymentMethodServices.get#PartyPaymentMethodInfo" out-map="methodInfo"
                 in-map="[partyId:partyId]"/>
-        <set field="methodInfoFlat" from="StupidUtilities.flattenNestedMap(methodInfo)"/>
+        <set field="methodInfoFlat" from="flattenNestedMap(methodInfo)"/>
         <entity-find entity-name="mantle.party.contact.PartyContactMechPostalAddress" list="partyPostalAddressList">
             <date-filter/><econdition field-name="partyId"/></entity-find>
         <entity-find entity-name="mantle.party.contact.PartyContactMechTelecomNumber" list="partyTelecomNumberList">

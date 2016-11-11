@@ -30,12 +30,13 @@ along with this software (see the LICENSE.md file). If not, see
         <if condition="parentShipmentType == 'ShpTpOutgoing'"><set field="shipmentTypeSet" from="outgoingTypeOut.enumIdSet"/></if>
 
         <entity-find entity-name="mantle.shipment.ShipmentFindView" list="shipmentList">
-            <search-form-inputs default-order-by="-estimatedReadyDate,-estimatedShipDate,-shipmentId"/>
+            <search-form-inputs default-order-by="-estimatedReadyDate,-estimatedShipDate,-shipmentId">
+                <default-parameters statusId="ShipInput,ShipScheduled,ShipPicked" statusId_op="in"
+                        entryDate_poffset="-1" entryDate_period="30d"/></search-form-inputs>
             <econdition field-name="shipmentTypeEnumId" operator="in" from="shipmentTypeSet" ignore="!shipmentTypeSet"/>
-            <select-field field-name="shipmentId"/><select-field field-name="shipmentTypeEnumId"/>
-            <select-field field-name="originFacilityName"/><select-field field-name="destinationFacilityName"/>
-            <select-field field-name="fromPartyId"/><select-field field-name="toPartyId"/>
-            <select-field field-name="statusId"/><select-field field-name="estimatedReadyDate"/>
+            <select-field field-name="shipmentId,shipmentTypeEnumId,shipWorkEffortId"/>
+            <select-field field-name="originFacilityName,destinationFacilityName"/>
+            <select-field field-name="fromPartyId,toPartyId,statusId,entryDate,estimatedReadyDate"/>
         </entity-find>
 
         <entity-find entity-name="mantle.facility.Facility" list="facilityList">
@@ -86,7 +87,7 @@ along with this software (see the LICENSE.md file). If not, see
         </container-dialog>
 
 
-        <form-list name="ShipmentList" list="shipmentList" skip-form="true">
+        <form-list name="ShipmentList" list="shipmentList" skip-form="true" header-dialog="true" select-columns="true" saved-finds="true" show-csv-button="true">
             <field name="shipmentId">
                 <header-field title="Shipment" show-order-by="true"><text-find size="10" hide-options="true"/></header-field>
                 <default-field><link url="shipmentDetail" text="${shipmentId}" link-type="anchor"/></default-field>
@@ -102,7 +103,8 @@ along with this software (see the LICENSE.md file). If not, see
             <field name="statusId">
                 <header-field title="Status" show-order-by="true">
                     <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#statusDropDown">
-                        <set field="statusTypeId" value="Shipment"/><set field="allowEmpty" value="true"/></widget-template-include>
+                        <set field="statusTypeId" value="Shipment"/><set field="allowMultiple" value="true"/>
+                        <set field="allowEmpty" value="true"/></widget-template-include>
                 </header-field>
                 <default-field><display-entity entity-name="moqui.basic.StatusItem"/></default-field>
             </field>
@@ -124,6 +126,8 @@ along with this software (see the LICENSE.md file). If not, see
                     <text-line ac-transition="getPartyList" ac-min-length="2" size="20" parameter-map="[roleTypeId:'Customer']"/></header-field>
                 <default-field><display-entity entity-name="mantle.party.PartyDetail" text="${organizationName?:''}${firstName?:''} ${lastName?:''} [${pseudoId}]"/></default-field>
             </field>
+            <field name="entryDate"><header-field show-order-by="true"><date-period/></header-field>
+                <default-field><display/></default-field></field>
             <field name="estimatedArrivalDate"><header-field show-order-by="true"><date-period/></header-field>
                 <default-field><display/></default-field></field>
             <field name="estimatedReadyDate"><header-field show-order-by="true"><date-period/></header-field>
@@ -136,7 +140,7 @@ along with this software (see the LICENSE.md file). If not, see
             <form-list-column><field-ref name="statusId"/></form-list-column>
             <form-list-column><field-ref name="originFacilityName"/><field-ref name="destinationFacilityName"/></form-list-column>
             <form-list-column><field-ref name="fromPartyId"/><field-ref name="toPartyId"/></form-list-column>
-            <form-list-column><field-ref name="estimatedArrivalDate"/><field-ref name="estimatedReadyDate"/></form-list-column>
+            <form-list-column><field-ref name="entryDate"/><field-ref name="estimatedArrivalDate"/><field-ref name="estimatedReadyDate"/></form-list-column>
             <form-list-column><field-ref name="findButton"/></form-list-column>
         </form-list>
     </widgets>
