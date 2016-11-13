@@ -36,7 +36,7 @@ along with this software (see the LICENSE.md file). If not, see
                     </script>
                 </then>
                 <else>
-                    <entity-find entity-name="mantle.party.PartyDetailAndRole" list="partyList" limit="20" distinct="true">
+                    <entity-find entity-name="mantle.party.PartyDetailAndRole" list="partyList" limit="20">
                         <econdition field-name="roleTypeId" operator="in" ignore-if-empty="true"/>
                         <econdition field-name="disabled" value="N" or-null="true"/>
                         <econditions combine="or">
@@ -46,8 +46,11 @@ along with this software (see the LICENSE.md file). If not, see
                             <econdition field-name="lastName" operator="like" value="%${term}%" ignore-case="true"/>
                             <econdition field-name="organizationName" operator="like" value="%${term}%" ignore-case="true"/>
                         </econditions>
-                        <select-field field-name="partyId,pseudoId,organizationName,firstName,lastName"/>
-                        <order-by field-name="^firstName,^lastName,^organizationName"/>
+                        <select-field field-name="partyId"/><select-field field-name="pseudoId"/>
+                        <select-field field-name="organizationName"/>
+                        <select-field field-name="firstName"/><select-field field-name="lastName"/>
+                        <order-by field-name="^firstName"/><order-by field-name="^lastName"/>
+                        <order-by field-name="^organizationName"/>
                     </entity-find>
                     <script>
                         def outList = []
@@ -104,12 +107,14 @@ along with this software (see the LICENSE.md file). If not, see
             </field>
             <field name="postalContactMechPurposeId">
                 <conditional-field condition="postalContactMechPurposeId"><hidden/></conditional-field>
-                <conditional-field condition="createPostal" title="Purpose"><drop-down>
-                    <entity-options key="${contactMechPurposeId}" text="${description}">
-                        <entity-find entity-name="mantle.party.contact.ContactMechPurpose">
-                            <econdition field-name="contactMechTypeEnumId" value="CmtPostalAddress"/>
-                            <order-by field-name="description"/></entity-find></entity-options>
-                </drop-down></conditional-field>
+                <conditional-field condition="createPostal" title="Purpose">
+                    <drop-down no-current-selected-key="${defaultPostalPurposeId?:''}">
+                        <entity-options key="${contactMechPurposeId}" text="${ec.l10n.localize(description)}">
+                            <entity-find entity-name="mantle.party.contact.ContactMechPurpose">
+                                <econdition field-name="contactMechTypeEnumId" value="CmtPostalAddress"/>
+                                <order-by field-name="description"/></entity-find></entity-options>
+                    </drop-down>
+                </conditional-field>
                 <default-field><ignored/></default-field>
             </field>
 
@@ -146,7 +151,7 @@ along with this software (see the LICENSE.md file). If not, see
             </field>
             <field name="countryGeoId">
                 <conditional-field condition="createPostal || postalContactMechPurposeId" title="">
-                    <drop-down no-current-selected-key="USA">
+                    <drop-down no-current-selected-key="SVK">
                         <entity-options key="${geoId}" text="${geoName}">
                             <entity-find entity-name="moqui.basic.Geo" list="geoList">
                                 <econdition field-name="geoTypeEnumId" value="GEOT_COUNTRY"/>
@@ -194,8 +199,8 @@ along with this software (see the LICENSE.md file). If not, see
             <field name="telecomContactMechPurposeId">
                 <conditional-field condition="telecomContactMechPurposeId"><hidden/></conditional-field>
                 <conditional-field condition="createTelecom" title="Purpose">
-                    <drop-down>
-                        <entity-options key="${contactMechPurposeId}" text="${description}">
+                    <drop-down no-current-selected-key="${defaultTelecomPurposeId?:''}">
+                        <entity-options key="${contactMechPurposeId}" text="${ec.l10n.localize(description)}">
                             <entity-find entity-name="mantle.party.contact.ContactMechPurpose">
                                 <econdition field-name="contactMechTypeEnumId" value="CmtTelecomNumber"/>
                                 <order-by field-name="description"/>
@@ -208,7 +213,7 @@ along with this software (see the LICENSE.md file). If not, see
             <field name="countryCode">
                 <conditional-field condition="createTelecom || telecomContactMechPurposeId || telecomContactMechId"
                         title="" tooltip="Country Code">
-                    <text-line size="3" maxlength="3" default-value="+1"/></conditional-field>
+                    <text-line size="4" maxlength="4" default-value="+421"/></conditional-field>
                 <default-field><ignored/></default-field>
             </field>
             <field name="areaCode">
@@ -231,8 +236,8 @@ along with this software (see the LICENSE.md file). If not, see
             <field name="emailContactMechPurposeId">
                 <conditional-field condition="emailContactMechPurposeId"><hidden/></conditional-field>
                 <conditional-field condition="createEmail" title="Purpose">
-                    <drop-down>
-                        <entity-options key="${contactMechPurposeId}" text="${description}">
+                    <drop-down no-current-selected-key="${defaultEmailPurposeId?:''}">
+                        <entity-options key="${contactMechPurposeId}" text="${ec.l10n.localize(description)}">
                             <entity-find entity-name="mantle.party.contact.ContactMechPurpose">
                                 <econdition field-name="contactMechTypeEnumId" value="CmtEmailAddress"/>
                                 <order-by field-name="description"/>
@@ -257,15 +262,15 @@ along with this software (see the LICENSE.md file). If not, see
                 <field-row><field-ref name="address1"/><field-ref name="unitNumber"/></field-row>
                 <field-ref name="address2"/>
                 <field-row-big title="City/Zip"><field-ref name="city"/>
-                    <field-ref name="postalCode"/><field-ref name="postalCodeExt"/></field-row-big>
+                    <field-ref name="postalCode"/><!--<field-ref name="postalCodeExt"/>--></field-row-big>
                 <field-row-big title="Country/State"><field-ref name="countryGeoId"/>
-                    <field-ref name="stateProvinceGeoId"/></field-row-big>
+                    <!--<field-ref name="stateProvinceGeoId"/>--></field-row-big>
                 <field-ref name="telecomContactMechPurposeId"/>
                 <field-row-big title="Phone"><field-ref name="countryCode"/><field-ref name="areaCode"/>
                     <field-ref name="contactNumber"/></field-row-big>
                 <field-ref name="emailContactMechPurposeId"/>
                 <field-ref name="emailAddress"/>
-                <fields-not-referenced/>
+                <!--<fields-not-referenced/>-->
                 <field-ref name="submitButton"/>
             </field-layout>
         </form-single>
@@ -287,11 +292,11 @@ along with this software (see the LICENSE.md file). If not, see
                 <default-field><ignored/></default-field>
             </field>
             <field name="routingNumber">
-                <conditional-field title="Routing #" condition="isBankAccount"><text-line size="20"/></conditional-field>
+                <conditional-field title="BIC" condition="isBankAccount"><text-line size="10"/></conditional-field>
                 <default-field><ignored/></default-field>
             </field>
             <field name="accountNumber">
-                <conditional-field title="Account #" condition="isBankAccount"><text-line size="20"/></conditional-field>
+                <conditional-field title="Account #" condition="isBankAccount"><text-line size="30"/></conditional-field>
                 <default-field><ignored/></default-field>
             </field>
 
@@ -342,7 +347,19 @@ along with this software (see the LICENSE.md file). If not, see
                 <default-field><ignored/></default-field>
             </field>
 
-            <field name="countryGeoId"><default-field title="Country"><hidden default-value="USA"/></default-field></field>
+            <!--<field name="countryGeoId"><default-field title="Country"><hidden default-value="USA"/></default-field></field>-->
+            <field name="countryGeoId">
+                <default-field title="Country">
+                    <drop-down no-current-selected-key="SVK">
+                        <entity-options key="${geoId}" text="${geoName}">
+                            <entity-find entity-name="moqui.basic.Geo" list="geoList">
+                                <econdition field-name="geoTypeEnumId" value="GEOT_COUNTRY"/>
+                                <order-by field-name="geoName"/>
+                            </entity-find>
+                        </entity-options>
+                    </drop-down>
+                </default-field>
+            </field>
             <field name="address1"><default-field title="Address Line 1"><text-line size="30"/></default-field></field>
             <field name="unitNumber"><default-field><text-line size="10"/></default-field></field>
             <field name="address2"><default-field title="Address Line 2"><text-line size="30"/></default-field></field>
@@ -369,7 +386,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <default-field><ignored/></default-field>
             </field>
             <field name="countryCode"><default-field title="">
-                <text-line size="3" maxlength="3" default-value="+1"/></default-field></field>
+                <text-line size="3" maxlength="3" default-value="+421"/></default-field></field>
             <field name="areaCode"><default-field title=""><text-line size="3" maxlength="3"/></default-field></field>
             <field name="contactNumber"><default-field title=""><text-line size="8" maxlength="8"/></default-field></field>
 
@@ -381,9 +398,9 @@ along with this software (see the LICENSE.md file). If not, see
                     <field-ref name="lastNameOnAccount"/></field-row-big>
                 <field-ref name="companyNameOnAccount"/>
 
-                <fields-not-referenced/>
+                <!--<fields-not-referenced/>-->
 
-                <field-row><field-ref name="routingNumber"/><field-ref name="accountNumber"/></field-row>
+                <field-row><field-ref name="accountNumber"/><field-ref name="routingNumber"/></field-row>
 
                 <field-row-big title="Card Number"><field-ref name="creditCardTypeEnumId"/>
                     <field-ref name="cardNumber"/></field-row-big>
@@ -391,11 +408,11 @@ along with this software (see the LICENSE.md file). If not, see
                     <field-ref name="expireYear"/></field-row-big>
 
                 <field-ref name="postalContactMechId"/>
-                <field-ref name="countryGeoId"/>
                 <field-row><field-ref name="address1"/><field-ref name="unitNumber"/></field-row>
                 <field-ref name="address2"/>
-                <field-row-big title="City/State/Zip"><field-ref name="city"/><field-ref name="stateProvinceGeoId"/>
-                    <field-ref name="postalCode"/><field-ref name="postalCodeExt"/></field-row-big>
+                <field-ref name="countryGeoId"/>
+                <field-row-big title="City/Zip"><field-ref name="city"/><!--<field-ref name="stateProvinceGeoId"/>-->
+                    <field-ref name="postalCode"/></field-row-big>
                 <field-ref name="telecomContactMechId"/>
                 <field-row-big title="Phone"><field-ref name="countryCode"/><field-ref name="areaCode"/>
                     <field-ref name="contactNumber"/></field-row-big>

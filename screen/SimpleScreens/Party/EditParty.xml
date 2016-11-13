@@ -111,7 +111,7 @@ along with this software (see the LICENSE.md file). If not, see
                         <field name="firstName"><default-field><text-line size="30"/></default-field></field>
                         <field name="middleName"><default-field><text-line size="20"/></default-field></field>
                         <field name="lastName"><default-field><text-line size="30"/></default-field></field>
-                        <field name="birthDate"><default-field><date-time type="date"/></default-field></field>
+                        <field name="birthDate"><default-field><date-time type="date" format="dd.MM.yyyy"/></default-field></field>
                         <field name="disabled"><default-field><drop-down>
                             <option key="N"/><option key="Y"/></drop-down></default-field></field>
 
@@ -316,7 +316,7 @@ along with this software (see the LICENSE.md file). If not, see
                                                         contactMechPurposeId:contactInfo.emailContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-                                            <label text="${contactInfo.emailContactMechPurpose.description}" type="p"/>
+                                            <label text="${ec.l10n.localize(contactInfo.emailContactMechPurpose.description)}" type="p"/>
                                             <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
                                         </row-col>
                                     </container-row>
@@ -345,7 +345,7 @@ along with this software (see the LICENSE.md file). If not, see
                                                         contactMechPurposeId:contactInfo.telecomContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-                                            <label text="${contactInfo.telecomContactMechPurpose.description}" type="p"/>
+                                            <label text="${ec.l10n.localize(contactInfo.telecomContactMechPurpose.description)}" type="p"/>
                                             <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
                                         </row-col>
                                     </container-row>
@@ -374,7 +374,7 @@ along with this software (see the LICENSE.md file). If not, see
                                                         contactMechPurposeId:contactInfo.postalContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-                                            <label text="${contactInfo.postalContactMechPurpose.description}" type="p"/>
+                                            <label text="${ec.l10n.localize(contactInfo.postalContactMechPurpose.description)}" type="p"/>
                                             <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
                                         </row-col>
                                     </container-row>
