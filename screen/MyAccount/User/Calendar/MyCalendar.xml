@@ -30,13 +30,15 @@ along with this software (see the LICENSE.md file). If not, see
         <default-response type="none"/>
     </transition>
 
+    <!-- see the inline HTML below with script and link elements; this approach doesn't work when screen rendered without webroot.xml, ie with any lastStandalone like in the new Vue based webroot
     <pre-actions>
         <script>html_scripts.add("/ssstatic/lib/fullcalendar/fullcalendar.min.js")</script>
         <script>html_scripts.add("/ssstatic/lib/fullcalendar/lang-all.js")</script>
         <script>html_stylesheets.add("/ssstatic/lib/fullcalendar/fullcalendar.min.css")</script>
     </pre-actions>
+    -->
     <actions>
-        <!-- <entity-find-one entity-name="mantle.party.PartyDetail" value-field="party"/> -->
+        <!-- set by parent: <entity-find-one entity-name="mantle.party.PartyDetail" value-field="party"/> -->
     </actions>
     <widgets>
         <!-- <label text="Calendar for ${ec.resource.expand('PartyNameTemplate','',party)}" type="h3"/> -->
@@ -66,17 +68,19 @@ along with this software (see the LICENSE.md file). If not, see
             </form-single>
         </container-dialog>
 
+        <container id="calendar"/>
         <render-mode>
-            <text type="html"><![CDATA[
-                <div id="calendar"></div>
+            <!-- NOTE: to work as Vue template link element must be closed and don't use $(document).ready() -->
+            <text type="html,vuet"><![CDATA[
+                <script src="${sri.buildUrl('/ssstatic/lib/fullcalendar/fullcalendar.min.js').url}" type="text/javascript"></script>
+                <script src="${sri.buildUrl('/ssstatic/lib/fullcalendar/lang-all.js').url}" type="text/javascript"></script>
+                <link rel="stylesheet" href="${sri.buildUrl('/ssstatic/lib/fullcalendar/fullcalendar.min.css').url}" type="text/css"/>
                 <script>
-$(document).ready(function() {
     $('#calendar').fullCalendar({ timezone:false, defaultView:'agendaWeek', lang:'{ec.user.locale.getLanguage()}',
         header: { left:'prev,next today', center:'title', right:'month,agendaWeek,agendaDay' },
         eventSources: [ { url:"${sri.buildUrl('getCalendarEvents').url}", type:'POST', data: { moquiSessionToken:'${ec.web.sessionToken}', partyId:'${partyId}' } },
             { url:"${sri.buildUrl('getCalendarTasks').url}", type:'POST', data:{ moquiSessionToken:'${ec.web.sessionToken}', partyId:'${partyId}' }, backgroundColor:'#5cb85c', borderColor:'#4cae4c' } ]
-    })
-});
+    });
                 </script>
             ]]></text>
         </render-mode>
