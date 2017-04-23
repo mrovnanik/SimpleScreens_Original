@@ -17,7 +17,7 @@ along with this software (see the LICENSE.md file). If not, see
 
     <parameter name="partyId" required="true"/>
 
-    <transition name="findOrder"><default-response url="../../Order/FindOrder"/></transition>
+    <!--<transition name="findOrder"><default-response url="../../Order/FindOrder"/></transition>-->
     <transition name="updateParty"><service-call name="mantle.party.PartyServices.update#PartyDetail"/>
         <default-response url="."/></transition>
 
@@ -71,8 +71,8 @@ along with this software (see the LICENSE.md file). If not, see
     </actions>
     <widgets>
         <container-row><row-col lg="6">
-            <link url="findOrder" text="Sales Orders" parameter-map="[customerPartyId:partyId]"/>
-            <link url="findOrder" text="Purchase Orders" parameter-map="[vendorPartyId:partyId]"/>
+            <!--<link url="findOrder" text="Sales Orders" parameter-map="[customerPartyId:partyId]"/>-->
+            <!--<link url="findOrder" text="Purchase Orders" parameter-map="[vendorPartyId:partyId]"/>-->
 
             <section name="NonUserPerson" condition="party?.partyTypeEnumId == 'PtyPerson' &amp;&amp; !userAccount">
                 <actions>
@@ -357,13 +357,8 @@ along with this software (see the LICENSE.md file). If not, see
                                                         contactMechPurposeId:contactInfo.telecomContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-<<<<<<< HEAD
                                             <label text="${ec.l10n.localize(contactInfo.telecomContactMechPurpose.description)}" type="p"/>
-                                            <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
-=======
-                                            <label text="${contactInfo.telecomContactMechPurpose.description}" type="p"/>
                                             <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
->>>>>>> refs/remotes/origin/master
                                         </row-col>
                                     </container-row>
                                 </widgets>
@@ -391,13 +386,8 @@ along with this software (see the LICENSE.md file). If not, see
                                                         contactMechPurposeId:contactInfo.postalContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-<<<<<<< HEAD
                                             <label text="${ec.l10n.localize(contactInfo.postalContactMechPurpose.description)}" type="p"/>
-                                            <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
-=======
-                                            <label text="${contactInfo.postalContactMechPurpose.description}" type="p"/>
                                             <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
->>>>>>> refs/remotes/origin/master
                                         </row-col>
                                     </container-row>
                                 </widgets>
