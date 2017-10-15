@@ -14,7 +14,7 @@ along with this software (see the LICENSE.md file). If not, see
 -->
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
-        default-menu-title="Payment" default-menu-index="1" default-menu-include="false">
+        default-menu-title="Payment" default-menu-index="0">
 
     <parameter name="paymentId" required="true"/>
 
@@ -34,40 +34,86 @@ along with this software (see the LICENSE.md file). If not, see
 
     <transition-include name="getGlAccountList" location="component://SimpleScreens/template/account/AccountTransitions.xml"/>
 
-    <transition name="PaymentCheck.pdf">
+    <!-- TRANSACTIONS UNECCESSARY FOR CURRENT USAGE -->
+    <!--<transition name="PaymentCheck.pdf">
         <default-response url="${ec.web.getWebappRootUrl(false, null)}/fop/apps/${appRoot}/Accounting/Payment/PaymentCheck" url-type="plain">
             <parameter name="renderMode" value="xsl-fo"/><parameter name="pageNoLimit" value="true"/>
             <parameter name="paymentIds" from="paymentId"/>
             <parameter name="filename" value="PaymentCheck-${paymentId}.pdf"/>
         </default-response>
-    </transition>
-    <transition name="PaymentDetail.pdf">
+    </transition>-->
+    <!--<transition name="PaymentDetail.pdf">
         <default-response url="${ec.web.getWebappRootUrl(false, null)}/fop/apps/${appRoot}/Accounting/Payment/PaymentDetail" url-type="plain">
             <parameter name="renderMode" value="xsl-fo"/><parameter name="pageNoLimit" value="true"/>
             <parameter name="paymentIds" from="paymentId"/>
             <parameter name="filename" value="PaymentDetail-${paymentId}.pdf"/>
         </default-response>
+    </transition>-->
+
+    <!-- CREATING SEPA XML PAYMENT -->
+    <transition name="generateSEPAXML3">
+        <actions>
+            <script>
+                <![CDATA[
+                            import java.io.*
+
+                            def screenRenderer = ec.screen.makeRender().rootScreen("component://SimpleScreens/screen/SimpleScreens/Accounting/Payment/PaymentSEPA.xml")
+                                            .webappName("webroot").renderMode("text")
+
+                            //for unknown reason, have to remove first 4 empty strings
+                            String renderOutput = screenRenderer.render().substring(4)
+                            ec.web.sendTextResponse(renderOutput, "text/xml", "platba_" + paymentId + "_SEPA.xml")
+                ]]>
+            </script>
+            <service-call name="update#mantle.account.payment.Payment" in-map="[paymentId:paymentId, statusId:'PmntAuthorized']"/>
+        </actions>
+
+        <default-response type="none"/>
+    </transition>
+
+    <transition name="generateForeignMulticash">
+        <actions>
+            <script>
+                <![CDATA[
+                            import java.io.*
+
+                            def screenRenderer = ec.screen.makeRender().rootScreen("component://SimpleScreens/screen/SimpleScreens/Accounting/Payment/ForeignPaymentMulticash.xml")
+                                            .webappName("webroot").renderMode("text")
+
+                            //for unknown reason, have to remove first 4 empty strings
+                            String renderOutput = screenRenderer.render().substring(4)
+                            ec.web.sendTextResponse(renderOutput, "text/xml", "MCH_" + paymentId + ".SKA")
+                ]]>
+            </script>
+            <service-call name="update#mantle.account.payment.Payment" in-map="[paymentId:paymentId, statusId:'PmntAuthorized']"/>
+        </actions>
+
+        <default-response type="none"/>
     </transition>
 
     <actions>
         <service-call name="mantle.account.PaymentServices.get#PaymentDisplayInfo" in-map="[paymentId:paymentId]" out-map="context"/>
         <set field="statusId" from="payment?.statusId"/>
         <set field="paymentEditable" from="statusId in ['PmntProposed', 'PmntPromised', 'PmntAuthorized']"/>
+        <set field="paymentEligibleForExport" from="statusId in ['PmntAuthorized']"/>
         <set field="paymentVoid" from="statusId in ['PmntCancelled', 'PmntVoid', 'PmntRefunded']"/>
+        <set field="isWorkflowAdmin" from="ec.user.hasPermission('WorkflowAdmin') ?: false"/>
     </actions>
+
     <widgets>
         <container-row>
             <row-col lg="6">
                 <container>
                     <section-iterate name="InvoiceLinks" list="invoiceIdSet" entry="invoiceId"><widgets>
-                        <link url="editInvoice" text="Invoice #${invoiceId}"/>
+                        <link url="editInvoice" text="${ec.l10n.localize('Invoice')} #${invoiceId}"/>
                     </widgets></section-iterate>
                     <section-iterate name="AcctgTransLinks" list="acctgTransIdSet" entry="acctgTransId"><widgets>
                         <link url="editTransaction" text="TX #${acctgTransId}" link-type="anchor-button"/>
                     </widgets></section-iterate>
 
-                    <link url="PaymentCheck.pdf" text="Check PDF"/>
-                    <link url="PaymentDetail.pdf" text="Detail PDF"/>
+                    <!-- Generating SEPA XML File -->
+                    <link url="generateSEPAXML3" text="SEPA XML" condition="paymentEligibleForExport"/>
+                    <link url="generateForeignMulticash" text="MultiCash" condition="paymentEligibleForExport"/>
                 </container>
 
                 <form-single name="EditPayment" transition="updatePayment" map="payment">
@@ -81,14 +127,16 @@ along with this software (see the LICENSE.md file). If not, see
                                 text="${organizationName?:''} ${firstName?:''} ${lastName?:''} [${pseudoId}]"/>
                     </default-field></field>
 
-                    <field name="effectiveDate"><default-field><display also-hidden="false"/></default-field></field>
+                    <field name="effectiveDate"><default-field><display also-hidden="false" format="dd.MM.yyyy"/></default-field></field>
 
                     <field name="amount">
-                        <conditional-field condition="paymentEditable"><text-line size="12" format="0.00"/></conditional-field>
-                        <default-field><display format="0.00"/></default-field>
+                        <!--<conditional-field condition="paymentEditable"><text-line size="12"/></conditional-field>-->
+                        <default-field><display/></default-field>
                     </field>
+
                     <field name="amountUomId"><default-field title="Currency">
                         <display-entity entity-name="moqui.basic.Uom" text="${description} [${uomId}]"/>
+
                         <!-- don't allow changing this, set based on partyAcctgPreference.baseCurrencyUomId in current impl:
                         <drop-down no-current-selected-key="USD"><entity-options key="${uomId}" text="${description} [${uomId}]">
                             <entity-find entity-name="moqui.basic.Uom">
@@ -97,9 +145,56 @@ along with this software (see the LICENSE.md file). If not, see
                             </entity-find>
                         </entity-options></drop-down>
                         -->
+
                     </default-field></field>
 
-                    <field name="originalCurrencyAmount"><default-field><text-line size="12" format="0.00"/></default-field></field>
+                    <!-- Variable symbol -->
+                    <field name="variableSymbol">
+                        <conditional-field title="Variable Symbol" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Variable Symbol">
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <!-- Specific symbol -->
+                    <field name="specificSymbol">
+                        <conditional-field title="Specific Symbol" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Specific Symbol">
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <!-- Constant symbol -->
+                    <field name="constantSymbol">
+                        <conditional-field title="Constant Symbol" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Constant Symbol">
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <!--<field name="paymentTypeEnumId">
+                        <conditional-field title="Type" condition="paymentEditable">
+                            <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
+                                <set field="enumTypeId" value="PaymentType"/></widget-template-include>
+                        </conditional-field>
+                        <default-field title="Type"><display-entity entity-name="moqui.basic.Enumeration"/></default-field>
+                    </field>-->
+
+                    <!--<field name="paymentInstrumentEnumId">
+                        <conditional-field title="Instrument" condition="paymentEditable">
+                            <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
+                                <set field="enumTypeId" value="PaymentInstrument"/></widget-template-include>
+                        </conditional-field>
+                        <default-field title="Instrument"><display-entity entity-name="moqui.basic.Enumeration"/></default-field>
+                    </field>-->
+
+                    <!--<field name="originalCurrencyAmount"><default-field><text-line size="12" format="0.00"/></default-field></field>
                     <field name="originalCurrencyUomId"><default-field title="Original Currency">
                         <drop-down allow-empty="true"><entity-options key="${uomId}" text="${description} [${uomId}]">
                             <entity-find entity-name="moqui.basic.Uom">
@@ -116,6 +211,7 @@ along with this software (see the LICENSE.md file). If not, see
                         </conditional-field>
                         <default-field title="Type"><display-entity entity-name="moqui.basic.Enumeration"/></default-field>
                     </field>
+
                     <field name="paymentInstrumentEnumId">
                         <conditional-field title="Instrument" condition="paymentEditable">
                             <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
@@ -153,10 +249,6 @@ along with this software (see the LICENSE.md file). If not, see
                                     text="${typeDescription} - ${description}"/>
                         </default-field>
                     </field>
-                    <field name="distGroupEnumId"><default-field title="Distribution Group">
-                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                            <set field="enumTypeId" value="PayDistributionGroup"/><set field="allowEmpty" value="true"/></widget-template-include>
-                    </default-field></field>
                     <field name="overrideGlAccountId">
                         <conditional-field title="Override (Cash) GL Account" condition="paymentEditable">
                             <text-line size="50" ac-transition="getGlAccountList"/></conditional-field>
@@ -166,9 +258,9 @@ along with this software (see the LICENSE.md file). If not, see
                     <field name="orderId">
                         <conditional-field condition="orderId" title="Order">
                             <display text="OrderPartNameTemplate" text-map="payment"/>
-                            <!-- TODO: how to link to OrderDetail in PopCommerce that doesn't exist in HiveMind?
+                            &lt;!&ndash; TODO: how to link to OrderDetail in PopCommerce that doesn't exist in HiveMind?
                             <link url="orderDetail" text="OrderPartNameTemplate" text-map="payment" link-type="anchor"
-                                    parameter-map="[orderId:orderId]"/> -->
+                                    parameter-map="[orderId:orderId]"/> &ndash;&gt;
                         </conditional-field>
                         <default-field><ignored/></default-field>
                     </field>
@@ -201,7 +293,7 @@ along with this software (see the LICENSE.md file). If not, see
                             <label text="Found payment(s) with same Ref Number: ${dupPaymentList.paymentId}" style="text-danger"/>
                         </conditional-field>
                         <default-field><ignored/></default-field>
-                    </field>
+                    </field>-->
 
                     <field name="comments"><default-field><text-area cols="60" rows="4"/></default-field></field>
 
@@ -215,7 +307,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <container-box>
                     <box-header><label text="Payment Applications" type="h5"/></box-header>
                     <box-body>
-                        <label text="Applied ${ec.l10n.formatCurrency(appliedTotal, payment.amountUomId)}, Unapplied ${ec.l10n.formatCurrency(unappliedTotal, payment.amountUomId)}" type="strong"/>
+                        <label text="${ec.l10n.localize('Applied')} ${ec.l10n.formatCurrency(appliedTotal, payment.amountUomId, 2)}, ${ec.l10n.localize('Unapplied')} ${ec.l10n.formatCurrency(unappliedTotal, payment.amountUomId, 2)}" type="strong"/>
                         <form-list name="PaymentApplicationList" list="paymentApplicationList">
                             <field name="invoiceId"><default-field title="Invoice">
                                 <link url="editInvoice" text="#${invoiceId?:''}${invoiceItemSeqId ? (':' + invoiceItemSeqId) : ''}" link-type="anchor"/>
@@ -224,7 +316,7 @@ along with this software (see the LICENSE.md file). If not, see
                                 <link url="editPayment" text="${toPaymentId?:''}" link-type="anchor"/>
                             </default-field></field>
                             <field name="amountApplied"><default-field title="Amount"><display currency-unit-field="payment.amountUomId"/></default-field></field>
-                            <field name="appliedDate"><default-field title="Date"><display/></default-field></field>
+                            <field name="appliedDate"><default-field title="Date"><display format="dd.MM.yyyy"/></default-field></field>
                         </form-list>
                     </box-body>
                 </container-box>
@@ -235,7 +327,7 @@ along with this software (see the LICENSE.md file). If not, see
                         <box-body>
                             <form-list name="UnpaidInvoiceList" list="unpaidInvoiceInfoList" transition="applyInvoicePayment">
                                 <field name="paymentId"><default-field><hidden/></default-field></field>
-                                <field name="invoiceId" from="invoice.invoiceId"><default-field title="Invoice">
+                                <field name="invoiceId" entry-name="invoice.invoiceId"><default-field title="Invoice">
                                     <display text=""/><!-- so that it is rendered, and a hidden value is added -->
                                     <link url="editInvoice" text="#${invoice.invoiceId?:''}" link-type="anchor"
                                             parameter-map="[invoiceId:invoice.invoiceId]"/>
@@ -244,7 +336,7 @@ along with this software (see the LICENSE.md file). If not, see
                                     <display currency-unit-field="invoice.currencyUomId"/></default-field></field>
                                 <field name="unpaidTotal"><default-field title="Unpaid">
                                     <display currency-unit-field="invoice.currencyUomId"/></default-field></field>
-                                <field name="amount" from="maxApplicableAmount">
+                                <field name="amount" entry-name="maxApplicableAmount">
                                     <conditional-field condition="maxApplicableAmount"><text-line size="8" format="0.00"/></conditional-field>
                                     <default-field title="Amount"><display text=""/></default-field>
                                 </field>
