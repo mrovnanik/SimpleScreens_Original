@@ -141,7 +141,7 @@ along with this software (see the LICENSE.md file). If not, see
 
                                             <!-- ORIGINAL CONDITION, have to add a new condition testing possession of general workflow admin role -->
                                             <!-- condition="ec.user.hasPermission(statusTransition.transitionName)" -->
-                        </section-itrate>
+                        </section-iterate>
                     </box-toolbar>
                     <box-body>
                         <section-iterate name="StatusChangeAndHistoryTable" list="reverseList" entry="statusHistory">
