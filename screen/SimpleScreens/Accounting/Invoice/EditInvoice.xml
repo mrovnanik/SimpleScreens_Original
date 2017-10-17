@@ -796,6 +796,17 @@ along with this software (see the LICENSE.md file). If not, see
                                                          value-field="contentTypeEnum">
                                             <field-map field-name="enumId" from="content.contentTypeEnumId"/>
                                         </entity-find-one>
+
+                                        <!--calculate displayName-->
+                                        <set field="calcDisplayName" from="content.displayName"/>
+
+                                        <script>
+                                            <![CDATA[
+                                                if (calcDisplayName == null) {
+                                                    calcDisplayName = content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)
+                                                }
+                                            ]]>
+                                        </script>
                                     </actions>
                                     <widgets>
                                         <container>
@@ -806,16 +817,16 @@ along with this software (see the LICENSE.md file). If not, see
                                             <link url="downloadContent"
                                                   condition="content.contentLocation"
                                                   parameter-map="[invoiceContentId:content.invoiceContentId]"
-                                                  text="${ec.l10n.localize('Download')} ${content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)}"/>
+                                                  text="${ec.l10n.localize('Download')} ${calcDisplayName}"/>
                                             <link url="openContent"
                                                   parameter-map="[invoiceContentId:content.invoiceContentId]"
-                                                  text="${ec.l10n.localize('Open')} ${content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)}"
+                                                  text="${ec.l10n.localize('Open')} ${calcDisplayName}"
                                                   target-window="_blank"
                                             />
                                             <link url="deleteContent"
                                                   confirmation="Are you sure you want to delete the content?"
                                                   parameter-map="[invoiceContentId:content.invoiceContentId]"
-                                                  text="${ec.l10n.localize('Delete')} ${content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)}"
+                                                  text="${ec.l10n.localize('Delete')} ${calcDisplayName}"
                                             />
 
                                             <container-dialog id="UpdateContentContainer" button-text="Edit Content">
