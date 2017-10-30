@@ -17,7 +17,12 @@ along with this software (see the LICENSE.md file). If not, see
         default-menu-title="Payments" default-menu-index="2">
 
     <subscreens default-item="FindPayment"/>
-    <widgets>
+
+    <!--<widgets>
         <subscreens-active/>
+    </widgets>-->
+
+    <widgets>
+        <subscreens-panel id="payment-panel" type="tab"/>
     </widgets>
 </screen>

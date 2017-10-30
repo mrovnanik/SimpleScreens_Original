@@ -12,7 +12,8 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
         default-menu-title="Party" default-menu-index="1">
 
     <parameter name="partyId" required="true"/>
@@ -50,19 +51,8 @@ along with this software (see the LICENSE.md file). If not, see
         <default-response url="."/></transition>
     <transition name="updatePartyNote"><service-call name="update#mantle.party.PartyNote"/>
         <default-response url="."/></transition>
-
-    <transition name="createContent"><service-call name="mantle.party.PartyServices.create#PartyContent"/>
+    <transition name="deletePartyNote"><service-call name="delete#mantle.party.PartyNote"/>
         <default-response url="."/></transition>
-    <transition name="updateContent"><service-call name="mantle.party.PartyServices.update#PartyContent"/>
-        <default-response url="."/></transition>
-    <transition name="downloadContent" read-only="true">
-        <parameter name="partyContentId"/>
-        <actions>
-            <entity-find-one entity-name="mantle.party.PartyContent" value-field="partyContent"/>
-            <script>ec.web.sendResourceResponse(partyContent?.contentLocation)</script>
-        </actions>
-        <default-response type="none"/>
-    </transition>
 
     <actions>
         <entity-find-one entity-name="mantle.party.PartyDetail" value-field="party"/>
@@ -108,9 +98,11 @@ along with this software (see the LICENSE.md file). If not, see
                 <widgets>
                     <form-single name="EditOrganizationForm" map="party" transition="updateParty">
                         <field name="partyId"><default-field><hidden/></default-field></field>
-                        <field name="pseudoId"><default-field title="ID"><text-line size="15"/></default-field></field>
+                        <field name="pseudoId"><default-field title="ID"><text-line size="15"/><label text="Fill in for easier navigation in views." style="text-danger"/></default-field></field>
                         <field name="organizationName"><default-field><text-line size="60"/></default-field></field>
                         <field name="disabled"><default-field><drop-down>
+                            <option key="N"/><option key="Y"/></drop-down></default-field></field>
+                        <field name="excludeFromPdf"><default-field><drop-down>
                             <option key="N"/><option key="Y"/></drop-down></default-field></field>
 
                         <field name="submitButton"><default-field title="Update Organization"><submit/></default-field></field>
@@ -123,7 +115,8 @@ along with this software (see the LICENSE.md file). If not, see
                         <field name="firstName"><default-field><text-line size="30"/></default-field></field>
                         <field name="middleName"><default-field><text-line size="20"/></default-field></field>
                         <field name="lastName"><default-field><text-line size="30"/></default-field></field>
-                        <field name="birthDate"><default-field><date-time type="date"/></default-field></field>
+                        <field name="personalTitle"><default-field><text-line size="20"/></default-field></field>
+                        <field name="birthDate"><default-field><date-time type="date" format="dd.MM.yyyy"/></default-field></field>
                         <field name="disabled"><default-field><drop-down>
                             <option key="N"/><option key="Y"/></drop-down></default-field></field>
 
@@ -132,7 +125,7 @@ along with this software (see the LICENSE.md file). If not, see
                 </fail-widgets>
             </section>
 
-            <section name="RolesSection">
+            <section name="RolesSection" condition="party?.partyTypeEnumId == 'PtyOrganization'">
                 <actions>
                     <entity-find entity-name="mantle.party.PartyRole" list="partyRoleList">
                         <econdition field-name="partyId"/></entity-find>
@@ -166,7 +159,7 @@ along with this software (see the LICENSE.md file). If not, see
                 </widgets>
             </section>
 
-            <section name="PartyIdentificationSection">
+            <section name="PartyIdentificationSection" condition="party?.partyTypeEnumId == 'PtyOrganization'">
                 <actions>
                     <entity-find entity-name="mantle.party.PartyIdentification" list="partyIdentificationList">
                         <econdition field-name="partyId"/></entity-find>
@@ -221,11 +214,130 @@ along with this software (see the LICENSE.md file). If not, see
                 </widgets>
             </section>
 
+            <section name="RelationshipSection" condition="party?.partyTypeEnumId == 'PtyOrganization'">
+                <actions>
+                    <entity-find entity-name="mantle.party.PartyRelationship" list="partyRelationshipList">
+                        <econdition field-name="fromPartyId" from="partyId"/>
+                    </entity-find>
+                </actions>
+                <widgets>
+                    <container-box>
+                        <box-header><label text="Relationships" type="h5"/></box-header>
+                        <box-toolbar>
+                            <container-dialog id="AddRelationshipDialog" button-text="Add Relationship">
+                                <form-single name="AddRelationshipForm" transition="createPartyRelationship">
+                                    <field name="partyId"><default-field><hidden/></default-field></field>
+                                    <field name="fromPartyId">
+                                        <default-field>
+                                            <hidden default-value="${partyId}"/>
+                                        </default-field>
+                                    </field>
+
+                                    <field name="toPartyId">
+                                        <default-field title="Organization Name">
+                                            <drop-down style="chosen-small">
+                                                <entity-options key="${partyId}" text="PartyNameTemplate">
+                                                    <entity-find entity-name="mantle.party.PartyDetailAndRole">
+                                                        <econdition field-name="roleTypeId" operator="in" value="Supplier,OrgInternal"/>
+                                                        <econdition field-name="disabled" value="N" or-null="true"/>
+                                                        <order-by field-name="organizationName,firstName"/></entity-find></entity-options>
+                                            </drop-down>
+                                        </default-field>
+                                    </field>
+                                    <!--<field name="toRoleTypeId">
+                                        <default-field title="Role">
+                                        <drop-down>
+                                            <entity-options key="${roleTypeId}" text="${description}">
+                                                <entity-find entity-name="mantle.party.RoleType"><order-by field-name="description"/></entity-find>
+                                            </entity-options>
+                                        </drop-down>
+                                        </default-field>
+                                    </field>-->
+                                    <field name="relationshipTypeEnumId">
+                                        <default-field title="Relationship">
+                                            <drop-down>
+                                                <entity-options key="${enumId}" text="${description}">
+                                                    <entity-find entity-name="moqui.basic.Enumeration">
+                                                        <econdition field-name="enumTypeId" value="PartyRelationshipType"/>
+                                                        <order-by field-name="description"/>
+                                                    </entity-find>
+                                                </entity-options>
+                                            </drop-down>
+                                        </default-field>
+                                    </field>
+                                    <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
+                                </form-single>
+                            </container-dialog>
+                            <container-dialog id="AddContactOwnershipDialog" button-text="Define Contact Ownership">
+                                <form-single name="AddAccountabilityForm" transition="createPartyRelationship">
+                                    <field name="partyId"><default-field><hidden/></default-field></field>
+                                    <field name="fromPartyId">
+                                        <default-field>
+                                            <hidden default-value="${partyId}"/>
+                                        </default-field>
+                                    </field>
+
+                                    <field name="toPartyId">
+                                        <default-field title="Organization Name">
+                                            <drop-down style="chosen-small">
+                                                <entity-options key="${partyId}" text="PartyNameTemplate">
+                                                    <entity-find entity-name="mantle.party.PartyDetailAndRole">
+                                                        <econdition field-name="roleTypeId" operator="in" value="OrgInternal"/>
+                                                        <econdition field-name="disabled" value="N" or-null="true"/>
+                                                        <order-by field-name="organizationName,firstName"/></entity-find></entity-options>
+                                            </drop-down>
+                                        </default-field>
+                                    </field>
+                                    <!--<field name="toRoleTypeId">
+                                        <default-field>
+                                            <hidden default-value="Contact"/>
+                                        </default-field>
+                                    </field>-->
+                                    <field name="relationshipTypeEnumId">
+                                        <default-field>
+                                            <hidden default-value="PrtContOwnership"/>
+                                        </default-field>
+                                    </field>
+                                    <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
+                                </form-single>
+                            </container-dialog>
+                        </box-toolbar>
+                        <box-body>
+                            <form-list name="RelationshipsForm" list="partyRelationshipList" transition="deletePartyRelationship">
+                                <field name="partyId"><default-field><hidden/></default-field></field>
+                                <field name="partyRelationshipId"><default-field><hidden/></default-field></field>
+                                <!--<field name="toRoleTypeId">
+                                    <default-field title="Relationship">
+                                        <display-entity entity-name="mantle.party.RoleType"/>
+                                    </default-field>
+                                </field>-->
+                                <field name="relationshipTypeEnumId">
+                                    <default-field title="Relationship">
+                                        <display-entity entity-name="moqui.basic.Enumeration" key-field-name="enumId" text="${description}"/>
+                                    </default-field>
+                                </field>
+                                <field name="toPartyId">
+                                    <default-field title="Organization Name">
+                                        <display-entity
+                                                entity-name="mantle.party.PartyDetail"
+                                                also-hidden="false"
+                                                key-field-name="partyId"
+                                                text="${organizationName?:''} ${firstName?:''} ${lastName?:''} [${pseudoId}]"/>
+                                    </default-field>
+                                </field>
+                                <field name="submitButton"><default-field title="Remove"><submit/></default-field></field>
+                            </form-list>
+                        </box-body>
+                    </container-box>
+                </widgets>
+            </section>
+
             <section name="UserSecuritySection" condition="userAccount">
                 <actions>
                     <entity-find entity-name="moqui.security.UserGroupMember" list="userGroupMemberList">
                         <date-filter/><econdition field-name="userId" from="userAccount?.userId"/></entity-find>
 
+                    <!-- TODO: limit to locales for tenant -->
                     <set field="localeStringList" from="[]"/>
                     <iterate list="Locale.getAvailableLocales()" entry="lcl"><script>localeStringList.add([locale:lcl.toString(), name:lcl.getDisplayName(ec.user.locale)])</script></iterate>
                     <order-map-list list="localeStringList"><order-by field-name="name"/></order-map-list>
@@ -267,33 +379,33 @@ along with this software (see the LICENSE.md file). If not, see
                 </widgets>
             </section>
         </row-col><row-col lg="6">
-            <section name="PaymentMethodSection">
+            <section name="PaymentMethodSection" condition="party?.partyTypeEnumId == 'PtyOrganization'">
                 <actions>
                     <service-call name="mantle.account.PaymentMethodServices.get#PartyPaymentMethodInfoList"
-                            in-map="[partyId:partyId]" out-map="ppmiOut"/>
+                                  in-map="[partyId:partyId]" out-map="ppmiOut"/>
                 </actions>
                 <widgets>
                     <container-box>
                         <box-header><label text="Payment Methods" type="h5"/></box-header>
                         <box-toolbar>
                             <dynamic-dialog id="CreateCreditCardDialog" button-text="Create Credit Card"
-                                    transition="updatePaymentMethodInfo" width="800"
-                                    parameter-map="[partyId:partyId, paymentMethodTypeEnumId:'PmtCreditCard']"/>
+                                            transition="updatePaymentMethodInfo" width="800"
+                                            parameter-map="[partyId:partyId, paymentMethodTypeEnumId:'PmtCreditCard']"/>
                             <dynamic-dialog id="CreateBankAccountDialog" button-text="Create Bank Account"
-                                    transition="updatePaymentMethodInfo" width="800"
-                                    parameter-map="[partyId:partyId, paymentMethodTypeEnumId:'PmtBankAccount']"/>
+                                            transition="updatePaymentMethodInfo" width="800"
+                                            parameter-map="[partyId:partyId, paymentMethodTypeEnumId:'PmtBankAccount']"/>
                         </box-toolbar>
                         <box-body>
                             <container style="float-box" type="ul">
                                 <section-iterate name="BillingInfoSection" list="ppmiOut.methodInfoList" entry="methodInfo">
                                     <widgets>
                                         <container type="li">
-                                            <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/PaymentMethodInfo.html.gstring"/></render-mode>
+                                            <render-mode><text type="html" location="component://SimpleScreens/template/party/PaymentMethodInfo.html.gstring"/></render-mode>
                                             <dynamic-dialog id="UpdatePaymentMethodDialog" button-text="Update"
-                                                    transition="updatePaymentMethodInfo" width="800"
-                                                    parameter-map="[partyId:partyId, paymentMethodId:methodInfo.paymentMethodId]"/>
+                                                            transition="updatePaymentMethodInfo" width="800"
+                                                            parameter-map="[partyId:partyId, paymentMethodId:methodInfo.paymentMethodId]"/>
                                             <link url="removePaymentMethod" text="Remove"
-                                                    parameter-map="[paymentMethodId:methodInfo.paymentMethodId]"/>
+                                                  parameter-map="[paymentMethodId:methodInfo.paymentMethodId]"/>
                                         </container>
                                     </widgets>
                                 </section-iterate>
@@ -305,14 +417,14 @@ along with this software (see the LICENSE.md file). If not, see
             <section name="ContactInfoSection">
                 <actions>
                     <service-call name="mantle.party.ContactServices.get#PartyContactInfoList" out-map="contactOut"
-                            in-map="[partyId:partyId, getAll:true]"/>
+                                  in-map="[partyId:partyId, getAll:true]"/>
                 </actions>
                 <widgets>
                     <container-box>
                         <box-header><label text="Email Addresses" type="h5"/></box-header>
                         <box-toolbar>
                             <dynamic-dialog id="AddEmailInfo" button-text="Add Email" transition="updateContactInfo"
-                                    parameter-map="[partyId:partyId, createEmail:'true']"/>
+                                            parameter-map="[partyId:partyId, createEmail:'true']"/>
                         </box-toolbar>
                         <box-body>
                             <section-iterate name="EmailInfoSection" list="contactOut.emailAddressList" entry="contactInfo">
@@ -320,16 +432,16 @@ along with this software (see the LICENSE.md file). If not, see
                                     <container-row>
                                         <row-col lg="6">
                                             <dynamic-dialog id="UpdateEmailInfo" button-text="Update"
-                                                    transition="updateContactInfo"
-                                                    parameter-map="[partyId:partyId, emailContactMechId:contactInfo.emailContactMechId,
+                                                            transition="updateContactInfo"
+                                                            parameter-map="[partyId:partyId, emailContactMechId:contactInfo.emailContactMechId,
                                                         emailContactMechPurposeId:contactInfo.emailContactMechPurposeId]"/>
                                             <link url="removeContactInfo" text="Remove"
-                                                    parameter-map="[partyId:partyId, contactMechId:contactInfo.emailContactMechId,
+                                                  parameter-map="[partyId:partyId, contactMechId:contactInfo.emailContactMechId,
                                                         contactMechPurposeId:contactInfo.emailContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-                                            <label text="${contactInfo.emailContactMechPurpose.description}" type="p"/>
-                                            <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
+                                            <label text="${ec.l10n.localize(contactInfo.emailContactMechPurpose.description)}" type="p"/>
+                                            <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
                                         </row-col>
                                     </container-row>
                                 </widgets>
@@ -341,7 +453,7 @@ along with this software (see the LICENSE.md file). If not, see
                         <box-header><label text="Phone Numbers" type="h5"/></box-header>
                         <box-toolbar>
                             <dynamic-dialog id="AddPhoneInfo" button-text="Add Phone" transition="updateContactInfo"
-                                    parameter-map="[partyId:partyId, createTelecom:'true']"/>
+                                            parameter-map="[partyId:partyId, createTelecom:'true']"/>
                         </box-toolbar>
                         <box-body>
                             <section-iterate name="PhoneInfoSection" list="contactOut.telecomNumberList" entry="contactInfo">
@@ -349,16 +461,16 @@ along with this software (see the LICENSE.md file). If not, see
                                     <container-row>
                                         <row-col lg="6">
                                             <dynamic-dialog id="UpdatePhoneInfo" button-text="Update"
-                                                    transition="updateContactInfo"
-                                                    parameter-map="[partyId:partyId, telecomContactMechId:contactInfo.telecomContactMechId,
+                                                            transition="updateContactInfo"
+                                                            parameter-map="[partyId:partyId, telecomContactMechId:contactInfo.telecomContactMechId,
                                                         telecomContactMechPurposeId:contactInfo.telecomContactMechPurposeId]"/>
                                             <link url="removeContactInfo" text="Remove"
-                                                    parameter-map="[partyId:partyId, contactMechId:contactInfo.telecomContactMechId,
+                                                  parameter-map="[partyId:partyId, contactMechId:contactInfo.telecomContactMechId,
                                                         contactMechPurposeId:contactInfo.telecomContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-                                            <label text="${contactInfo.telecomContactMechPurpose.description}" type="p"/>
-                                            <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
+                                            <label text="${ec.l10n.localize(contactInfo.telecomContactMechPurpose.description)}" type="p"/>
+                                            <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
                                         </row-col>
                                     </container-row>
                                 </widgets>
@@ -370,7 +482,7 @@ along with this software (see the LICENSE.md file). If not, see
                         <box-header><label text="Mailing Addresses" type="h5"/></box-header>
                         <box-toolbar>
                             <dynamic-dialog id="AddAddressInfo" button-text="Add Address" transition="updateContactInfo"
-                                    width="840" parameter-map="[partyId:partyId, createPostal:'true']"/>
+                                            width="840" parameter-map="[partyId:partyId, createPostal:'true']"/>
                         </box-toolbar>
                         <box-body>
                             <section-iterate name="PostalInfoSection" list="contactOut.postalAddressList" entry="contactInfo">
@@ -378,16 +490,16 @@ along with this software (see the LICENSE.md file). If not, see
                                     <container-row>
                                         <row-col lg="6">
                                             <dynamic-dialog id="UpdatePostalInfo" button-text="Update Address"
-                                                    transition="updateContactInfo" width="840"
-                                                    parameter-map="[partyId:partyId, postalContactMechId:contactInfo.postalContactMechId,
+                                                            transition="updateContactInfo" width="840"
+                                                            parameter-map="[partyId:partyId, postalContactMechId:contactInfo.postalContactMechId,
                                                         postalContactMechPurposeId:contactInfo.postalContactMechPurposeId]"/>
                                             <link url="removeContactInfo" text="Remove"
-                                                    parameter-map="[partyId:partyId, contactMechId:contactInfo.postalContactMechId,
+                                                  parameter-map="[partyId:partyId, contactMechId:contactInfo.postalContactMechId,
                                                         contactMechPurposeId:contactInfo.postalContactMechPurposeId]"/>
                                         </row-col>
                                         <row-col lg="6">
-                                            <label text="${contactInfo.postalContactMechPurpose.description}" type="p"/>
-                                            <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
+                                            <label text="${ec.l10n.localize(contactInfo.postalContactMechPurpose.description)}" type="p"/>
+                                            <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
                                         </row-col>
                                     </container-row>
                                 </widgets>
@@ -396,87 +508,55 @@ along with this software (see the LICENSE.md file). If not, see
                     </container-box>
                 </widgets>
             </section>
-
-            <section name="NotesSection"><actions>
-                <entity-find entity-name="mantle.party.PartyNote" list="partyNoteList">
-                    <econdition field-name="partyId"/><order-by field-name="-noteDate"/></entity-find>
-            </actions><widgets>
-                <container-box><box-header><label text="Notes" type="h5"/></box-header><box-toolbar>
-                    <container-dialog id="NewNoteDialog" button-text="Add Note">
-                        <form-single name="NewNoteForm" transition="createPartyNote">
-                            <field name="partyId"><default-field><hidden/></default-field></field>
-                            <field name="noteText"><default-field title="Note"><text-area cols="60" rows="6"/></default-field></field>
-                            <field name="submitButton"><default-field title="Add Note"><submit/></default-field></field>
-                        </form-single>
-                    </container-dialog>
-                </box-toolbar><box-body>
-                    <section-iterate name="NoteIterateSection" list="partyNoteList" entry="partyNote"><actions>
-                        <entity-find-one entity-name="mantle.party.PersonWithUserAccount" value-field="paua">
-                            <field-map field-name="userId" from="partyNote.userId"/></entity-find-one>
-                    </actions><widgets>
-                        <label text="By ${paua?.firstName?:''} ${paua?.lastName?:''} (${paua?.username ?: partyNote.userId}) at ${ec.l10n.format(partyNote.noteDate, 'yyyy-MM-dd HH:mm')}" type="strong"/>
-                        <section name="UpdateNoteSection" condition="partyNote.userId == ec.user.userId"><widgets>
-                            <container-dialog id="UpdateNoteContainer" button-text="Edit Note">
-                                <form-single name="UpdateNoteForm" transition="updatePartyNote" map="partyNote">
+            <section name="NotesSection">
+                <actions>
+                    <entity-find entity-name="mantle.party.PartyNote" list="partyNoteList">
+                        <econdition field-name="partyId"/><order-by field-name="-noteDate"/>
+                        <econdition field-name="softDeleted" value="N" or-null="true"/>
+                    </entity-find>
+                </actions>
+                <widgets>
+                    <container-box>
+                        <box-header><label text="Notes" type="h5"/></box-header>
+                        <box-toolbar>
+                            <container-dialog id="NewNoteDialog" button-text="Add Note">
+                                <form-single name="NewNoteForm" transition="createPartyNote">
                                     <field name="partyId"><default-field><hidden/></default-field></field>
-                                    <field name="noteDate"><default-field><hidden/></default-field></field>
                                     <field name="noteText"><default-field title="Note"><text-area cols="60" rows="6"/></default-field></field>
-                                    <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
+                                    <field name="submitButton"><default-field title="Add Note"><submit/></default-field></field>
                                 </form-single>
                             </container-dialog>
-                        </widgets></section>
-                        <label text="${partyNote.noteText}" type="p"/>
-                    </widgets></section-iterate>
-                </box-body></container-box>
-            </widgets></section>
-            <section name="ContentSection"><actions>
-                <entity-find entity-name="mantle.party.PartyContent" list="contentList">
-                    <econdition field-name="partyId"/><order-by field-name="-contentDate"/></entity-find>
-            </actions><widgets>
-                <container-box><box-header><label text="Content" type="h5"/></box-header><box-toolbar>
-                    <container-dialog id="NewContentDialog" button-text="Add Content">
-                        <form-single name="NewContentForm" transition="createContent">
-                            <field name="partyId"><default-field><hidden/></default-field></field>
-                            <field name="partyContentTypeEnumId"><default-field title="Content Type">
-                                <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                                    <set field="enumTypeId" value="PartyContentType"/><set field="allowEmpty" value="true"/></widget-template-include>
-                            </default-field></field>
-                            <field name="contentFile"><default-field><file/></default-field></field>
-                            <field name="description"><default-field><text-line size="60"/></default-field></field>
-                            <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
-                        </form-single>
-                    </container-dialog>
-                </box-toolbar><box-body>
-                    <section-iterate name="ContentIterateSection" list="contentList" entry="content"><actions>
-                        <entity-find-one entity-name="mantle.party.PersonWithUserAccount" value-field="paua">
-                            <field-map field-name="userId" from="content.userId"/></entity-find-one>
-                        <entity-find-one entity-name="moqui.basic.Enumeration" value-field="contentTypeEnum">
-                            <field-map field-name="enumId" from="content.partyContentTypeEnumId"/></entity-find-one>
-                    </actions><widgets>
-                        <container>
-                            <container><label text="${contentTypeEnum?.description?:'No Type'}" type="strong"/></container>
-                            <link url="downloadContent" condition="content.contentLocation"
-                                  parameter-map="[partyContentId:content.partyContentId]"
-                                  text="Download ${content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)}"/>
-                            <container-dialog id="UpdateContentContainer" button-text="Edit Content">
-                                <form-single name="UpdateContentForm" transition="updateContent" map="content">
-                                    <field name="partyContentId"><default-field><hidden/></default-field></field>
-                                    <field name="partyId"><default-field><hidden/></default-field></field>
-                                    <field name="partyContentTypeEnumId"><default-field title="Content Type">
-                                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                                            <set field="enumTypeId" value="PartyContentType"/><set field="allowEmpty" value="true"/></widget-template-include>
-                                    </default-field></field>
-                                    <field name="contentFile"><default-field><file/></default-field></field>
-                                    <field name="description"><default-field><text-line size="60"/></default-field></field>
-                                    <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
-                                </form-single>
-                            </container-dialog>
-                            <container><label condition="paua" text="By ${ec.resource.expand('UsernameTemplate','',paua+[userId:content.userId])} at ${ec.l10n.format(content.contentDate, 'yyyy-MM-dd HH:mm')}"/></container>
-                            <label text="${content.description ?: 'No Description'}" type="p"/>
-                        </container>
-                    </widgets></section-iterate>
-                </box-body></container-box>
-            </widgets></section>
+                        </box-toolbar>
+                        <box-body>
+                            <section-iterate name="NoteIterateSection" list="partyNoteList" entry="partyNote">
+                                <actions>
+                                    <entity-find-one entity-name="mantle.party.PersonAndUserAccount" value-field="paua">
+                                        <field-map field-name="userId" from="partyNote.userId"/></entity-find-one>
+                                </actions>
+                                <widgets>
+                                    <container-row>
+                                        <row-col lg="6">
+                                            <container-dialog id="UpdateNoteContainer" button-text="Edit Note" >
+                                                <form-single name="UpdateNoteForm" transition="updatePartyNote" map="partyNote" >
+                                                    <field name="partyId"><default-field><hidden/></default-field></field>
+                                                    <field name="noteDate"><default-field><hidden/></default-field></field>
+                                                    <field name="noteText"><default-field title="Note"><text-area cols="60" rows="6"/></default-field></field>
+                                                    <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
+                                                </form-single>
+                                            </container-dialog>
+                                            <link url="deletePartyNote" text="Remove" parameter-map="[partyId:partyNote.partyId, noteDate:partyNote.noteDate, noteText:partyNote.noteText]"/>
+                                        </row-col>
+                                        <row-col lg="6">
+                                            <label text="${paua?.firstName?:''} ${paua?.lastName?:''} ${ec.l10n.format(partyNote.noteDate, 'dd.MM.yyyy HH:mm')}" type="strong"/>
+                                            <label text="${partyNote.noteText}" type="p"/>
+                                        </row-col>
+                                    </container-row>
+                                </widgets>
+                            </section-iterate>
+                        </box-body>
+                    </container-box>
+                </widgets>
+            </section>
         </row-col></container-row>
     </widgets>
 </screen>

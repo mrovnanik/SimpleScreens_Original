@@ -9,7 +9,7 @@ ${methodInfo.creditCard ? '<p>' + (methodInfo.creditCardTypeEnum?.description ?:
 ${methodInfo.paymentMethod?.firstNameOnAccount ? '<p>' + methodInfo.paymentMethod.firstNameOnAccount + ' ' + (methodInfo.paymentMethod.middleNameOnAccount?:'') + '' + (methodInfo.paymentMethod.lastNameOnAccount?:'') + '</p>' : ''}
 ${methodInfo.paymentMethod?.companyNameOnAccount ? '<p>' + methodInfo.paymentMethod.companyNameOnAccount + '</p>' : ''}
 
-${methodInfo.postalAddress?.address1 ? '<p>' + methodInfo.postalAddress.address1 + (methodInfo.postalAddress.unitNumber ? ' #' + methodInfo.postalAddress.unitNumber : '') + '</p>' : ''}
+${methodInfo.postalAddress?.address1 ? '<p>' + methodInfo.postalAddress.address1 + (methodInfo.postalAddress.unitNumber ? ' ' + methodInfo.postalAddress.unitNumber : '') + '</p>' : ''}
 ${methodInfo.postalAddress?.address2 ? '<p>' + methodInfo.postalAddress.address2 + '</p>' : ''}
 ${methodInfo.postalAddress ? '<p>' + (methodInfo.postalAddress.city ?: '') + (methodInfo.postalAddressStateGeo?.geoCodeAlpha2 ? ', ' + methodInfo.postalAddressStateGeo.geoCodeAlpha2 : '') + ' ' + (methodInfo.postalAddress.postalCode ?: '') + (methodInfo.postalAddress.postalCodeExt ? '-' + methodInfo.postalAddress.postalCodeExt : '') + '</p>' : ''}
 ${methodInfo.telecomNumber ? '<p>' + (methodInfo.telecomNumber.countryCode ? methodInfo.telecomNumber.countryCode + '-' : '') + (methodInfo.telecomNumber.areaCode ? methodInfo.telecomNumber.areaCode + '-' : '') + (methodInfo.telecomNumber.contactNumber ?: '') + '</p>' : ''}

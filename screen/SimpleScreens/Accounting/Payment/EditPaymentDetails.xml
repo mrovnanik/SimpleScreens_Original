@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This software is in the public domain under CC0 1.0 Universal plus a
+Grant of Patent License.
+
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software (see the LICENSE.md file). If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+        default-menu-title="Payment Details" default-menu-index="1">
+
+    <parameter name="paymentId" required="true"/>
+
+    <transition name="updatePayment"><service-call name="update#mantle.account.payment.Payment"/>
+        <default-response url="."/></transition>
+
+    <!-- Service for fetching data related to account used for filling input -->
+    <transition name="fetchAccountData" read-only="true">
+        <service-call name="mantle.account.PaymentMethodServicesEnhancements.get#AccountInfo" web-send-json-response="true" in-map="context">
+
+        </service-call>
+        <default-response type="none"/>
+    </transition>
+
+    <actions>
+        <service-call name="mantle.account.PaymentServices.get#PaymentDisplayInfo" in-map="[paymentId:paymentId]" out-map="context"/>
+        <set field="statusId" from="payment?.statusId"/>
+        <!--<set field="paymentEditable" from="statusId in ['PmntProposed', 'PmntPromised', 'PmntAuthorized']"/>-->
+        <set field="paymentEditable" value="true"/>
+        <set field="paymentVoid" from="statusId in ['PmntCancelled', 'PmntVoid', 'PmntRefunded']"/>
+        <set field="isWorkflowAdmin" from="ec.user.hasPermission('WorkflowAdmin') ?: false"/>
+
+        <!-- Search bank accounts -->
+        <entity-find entity-name="mantle.account.method.BankAccounts" list="bankAccountsToCredit">
+            <!-- if it's needed to offer only accounts of the party, the following line has to be uncommented -->
+            <!--<econdition field-name="ownerPartyId" operator="equals" from="payment?.toPartyId"/>-->
+            <date-filter from-field-name="fromDate" thru-field-name="thruDate" valid-date="ec.user.nowTimestamp"/>
+        </entity-find>
+
+        <entity-find entity-name="mantle.account.method.BankAccounts" list="bankAccountsToDebit">
+            <econdition field-name="ownerPartyId" operator="equals" from="payment?.fromPartyId"/>
+            <date-filter from-field-name="fromDate" thru-field-name="thruDate" valid-date="ec.user.nowTimestamp"/>
+        </entity-find>
+    </actions>
+
+    <widgets>
+        <render-mode>
+            <text type="html">
+                <![CDATA[
+                    <script>
+                        function afterChange_CDT(accountNumber) {
+                            //display info
+                            //window.alert("Account Number: " + accountNumber);
+
+                            getJSON("${sri.buildUrl('fetchAccountData').url}?accountNumber=" + accountNumber, function(err, data) {
+                                  if (err != null) {
+                                        window.alert("Something went wrong: " + err);
+                                  } else {
+                                        //window.alert("Your query count: " + data.query.count);
+                                        //window.alert(JSON.stringify(data));
+                                        $("input[name='cdtBIC']").val(data.bankBIC);
+                                        $("input[name='cdtBank']").val(data.bankName);
+                                        //$("input[name='cdtAddressCity']").val(data.bankAddressCity);
+                                        //$("input[name='cdtAddressStreet']").val(data.bankAddressStreet);
+                                        //$("input[name='cdtAddressZIP']").val(data.bankAddressZIP);
+                                        //$("input[name='cdtAddressCountry']").val(data.bankAddressCountry);
+                                  }
+                            });
+                        };
+
+                        function afterChange_DBT(accountNumber) {
+                            //display info
+                            //window.alert("Account Number: " + accountNumber);
+
+                            getJSON("${sri.buildUrl('fetchAccountData').url}?accountNumber=" + accountNumber, function(err, data) {
+                                  if (err != null) {
+                                        window.alert("Something went wrong: " + err);
+                                  } else {
+                                        //window.alert("Your query count: " + data.query.count);
+                                        //window.alert(JSON.stringify(data));
+                                        $("input[name='dbtBIC']").val(data.bankBIC);
+                                        $("input[name='dbtBank']").val(data.bankName);
+                                        //$("input[name='dbtAddressCity']").val(data.bankAddressCity);
+                                        //$("input[name='dbtAddressStreet']").val(data.bankAddressStreet);
+                                        //$("input[name='dbtAddressZIP']").val(data.bankAddressZIP);
+                                        //$("input[name='dbtAddressCountry']").val(data.bankAddressCountry);
+                                  }
+                            });
+                        };
+
+                        var getJSON = function(url, callback) {
+                            var xhr = new XMLHttpRequest();
+                            xhr.open("get", url, true);
+                            xhr.responseType = "json";
+                            xhr.onload = function() {
+                                var status = xhr.status;
+                                if (status == 200) {
+                                    callback(null, xhr.response);
+                                } else {
+                                    callback(status);
+                                }
+                            };
+                            xhr.send();
+                        };
+                    </script>
+                ]]>
+            </text>
+        </render-mode>
+
+        <container-row>
+            <row-col lg="6">
+
+                <!-- IBAN debit -->
+                <form-single name="EditPaymentDetails_Debit" transition="updatePayment" map="payment">
+                    <field name="paymentId"><default-field><hidden/></default-field></field>
+
+                    <!-- IBAN debit -->
+                    <field name="dbtParty">
+                        <conditional-field condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field>
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <field name="dbtIBAN">
+                        <conditional-field title="IBAN - debit" condition="paymentEditable">
+                            <!--<text-line/>-->
+                            <drop-down-onchange allow-empty="false" current="selected" on-change-function="afterChange_DBT(this.value)">
+                                <list-options list="bankAccountsToDebit" key="${accountNumber}" text="BankAccountTemplate"/>
+                            </drop-down-onchange>
+                        </conditional-field>
+                        <default-field title="IBAN - debit">
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <!--<field name="dbtIBAN"><default-field title="IBAN - debit"><display/></default-field></field>-->
+
+                    <field name="dbtBIC">
+                        <conditional-field title="BIC" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="BIC">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="dbtBank">
+                        <conditional-field title="Bank" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Bank">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="dbtAddressStreet">
+                        <conditional-field title="Address" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Address">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="dbtAddressCity">
+                        <conditional-field title="City" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="City">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="dbtAddressZIP">
+                        <conditional-field title="ZIP" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="ZIP">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="dbtAddressCountry">
+                        <conditional-field title="Country" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Country">
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <field name="submitButton">
+                        <conditional-field title="Update" condition="paymentEditable">
+                            <submit/>
+                        </conditional-field>
+                        <default-field title=""/>
+                    </field>
+                    <!--<field name="submitButton"><default-field title="Update"><submit/></default-field></field>-->
+                </form-single>
+            </row-col>
+            <row-col lg="6">
+
+                <!-- IBAN credit -->
+                <form-single name="EditPaymentDetails_Credit" transition="updatePayment" map="payment">
+                    <field name="paymentId"><default-field><hidden/></default-field></field>
+
+                    <!-- IBAN credit -->
+                    <field name="cdtParty">
+                        <conditional-field condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field>
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <field name="cdtIBAN">
+                        <conditional-field title="IBAN - credit" condition="paymentEditable">
+
+                            <drop-down-onchange allow-empty="false" current="selected" on-change-function="afterChange_CDT(this.value)">
+                                <list-options list="bankAccountsToCredit" text="BankAccountTemplate" key="${accountNumber}"/>
+                            </drop-down-onchange>
+                        </conditional-field>
+                        <default-field title="IBAN - credit">
+                            <display/>
+                        </default-field>
+
+                        <!--<default-field title="IBAN - credit">
+                            <drop-down current="selected">
+                                <entity-options key="${accountNumber}" text="BankAccountTemplate">
+                                    <entity-find entity-name="mantle.account.method.BankAccounts">
+                                        &lt;!&ndash; if it's needed to offer only accounts of the party, the following line has to be uncommented &ndash;&gt;
+                                        &lt;!&ndash;<econdition field-name="ownerPartyId" operator="equals" from="payment?.toPartyId"/>&ndash;&gt;
+                                        <date-filter from-field-name="fromDate" thru-field-name="thruDate" valid-date="ec.user.nowTimestamp"/>
+                                    </entity-find>
+                                </entity-options>
+                            </drop-down>
+                        </default-field>-->
+                    </field>
+
+                    <!--<field name="cdtIBAN"><default-field title="IBAN - credit"><display/></default-field></field>-->
+
+                    <field name="cdtBIC">
+                        <conditional-field title="BIC" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="BIC">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="cdtBank">
+                        <conditional-field title="Bank" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Bank">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="cdtAddressStreet">
+                        <conditional-field title="Address" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Address">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="cdtAddressCity">
+                        <conditional-field title="City" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="City">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="cdtAddressZIP">
+                        <conditional-field title="ZIP" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="ZIP">
+                            <display/>
+                        </default-field>
+                    </field>
+                    <field name="cdtAddressCountry">
+                        <conditional-field title="Country" condition="paymentEditable">
+                            <text-line/>
+                        </conditional-field>
+                        <default-field title="Country">
+                            <display/>
+                        </default-field>
+                    </field>
+
+                    <field name="submitButton">
+                        <conditional-field title="Update" condition="paymentEditable">
+                            <submit/>
+                        </conditional-field>
+                        <default-field title=""/>
+                    </field>
+                    <!--<field name="submitButton"><default-field title="Update"><submit/></default-field></field>-->
+                </form-single>
+            </row-col>
+        </container-row>
+
+    </widgets>
+</screen>

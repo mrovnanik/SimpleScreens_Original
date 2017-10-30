@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This software is in the public domain under CC0 1.0 Universal plus a
+Grant of Patent License.
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software (see the LICENSE.md file). If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+        default-menu-include="false" standalone="true">
+
+    <actions>
+        <!--presumably, this should load the data used for printing-->
+        <!--<service-call name="mantle.account.InvoiceServices.get#InvoicePrintInfo"
+                      in-map="[invoiceId:invoiceId]" out-map="context"/>-->
+        
+        <!--<entity-find entity-name="mantle.account.invoice.InvoiceItem" list="invoiceItemList"/>-->
+        <entity-find entity-name="mantle.party.PartyDetailAndRole" list="supplierList">
+            <econdition field-name="roleTypeId" operator="equals" value="Supplier"/>
+            <econdition field-name="partyTypeEnumId" operator="equals" value="PtyOrganization"/>
+            <econdition field-name="disabled" value="N" or-null="true"/>
+            <econdition field-name="excludeFromPdf" value="N" or-null="true"/>
+            <order-by field-name="organizationName"/>
+        </entity-find>
+
+        <entity-find entity-name="mantle.party.contact.ContactMechPurpose" list="enumContactTypes">
+            <econdition field-name="contactMechTypeEnumId" operator="in" value="CmtEmailAddress,CmtTelecomNumber"/>
+            <select-field field-name="description"/>
+            <select-field field-name="contactMechPurposeId"/>
+        </entity-find>
+
+        <set field="translatedContactTypes" type="NewMap" from="[:]"/>
+
+        <script>
+            <![CDATA[
+                for (sci in enumContactTypes) {
+                    translatedContactTypes.put(sci.contactMechPurposeId, ec.l10n.localize(sci.description))
+                }
+                //ec.logger.info("translatedContactTypes = ${translatedContactTypes.toString()}")
+            ]]>
+        </script>
+        <log level="info" message="logoPath in printPhoneBook.xml is : ${logoPath}"/>
+        <log message="Suppliers loaded ${supplierList.size()}" level="info"/>
+    </actions>
+    <widgets>
+        <render-mode>
+            <text type="xsl-fo" location="component://SimpleScreens/template/party/PhoneBook.xsl-fo.ftl"
+                  template="true" encode="false" no-boundary-comment="true"/>
+        </render-mode>
+    </widgets>
+</screen>

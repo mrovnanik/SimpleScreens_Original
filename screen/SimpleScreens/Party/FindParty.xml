@@ -23,7 +23,6 @@ along with this software (see the LICENSE.md file). If not, see
         <default-response url="../EditParty"/></transition>
     <transition name="createOrganization"><service-call name="mantle.party.PartyServices.create#Organization"/>
         <default-response url="../EditParty"/></transition>
-    <transition-include name="getPartyList" location="component://SimpleScreens/template/party/PartyForms.xml"/>
 
     <!-- <pre-actions><set field="roleTypeId" value="Customer"/></pre-actions> -->
     <actions>
@@ -60,9 +59,6 @@ along with this software (see the LICENSE.md file). If not, see
                 <field name="areaCode"><default-field><text-line size="5"/></default-field></field>
                 <field name="contactNumber"><default-field><text-line size="10"/></default-field></field>
 
-                <field name="contactOwnerPartyId"><default-field title="Contact Owner">
-                    <text-line ac-transition="getPartyList" ac-min-length="2" size="40" parameter-map="[roleTypeId:null]"/></default-field></field>
-
                 <field name="submitButton"><default-field title="Find"><submit/></default-field></field>
             </form-single>
         </container-dialog>
@@ -78,6 +74,8 @@ along with this software (see the LICENSE.md file). If not, see
             <form-single name="CreateOrganizationForm" transition="createOrganization">
                 <field name="roleTypeId"><default-field><hidden/></default-field></field>
                 <field name="organizationName"><default-field><text-line size="30"/></default-field></field>
+                <field name="partyICO"><default-field title="Company Identification Number"><text-line/></default-field></field>
+                <field name="partyDIC"><default-field title="Tax Number"><text-line/></default-field></field>
                 <field name="submitButton"><default-field title="Create"><submit/></default-field></field>
             </form-single>
         </container-dialog>

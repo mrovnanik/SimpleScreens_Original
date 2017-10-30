@@ -33,37 +33,112 @@ along with this software (see the LICENSE.md file). If not, see
         <service-call name="mantle.account.InvoiceServices.get#InvoiceTotal" in-map="[invoiceId:invoiceId]" out-map="context"/>
         <entity-find entity-name="mantle.account.invoice.InvoiceItem" list="invoiceItemList">
             <econdition field-name="invoiceId"/></entity-find>
-
-        <set field="editableStatusIds" from="new HashSet(['InvoiceInProcess', 'InvoiceIncoming', 'InvoiceReceived'])"/>
-        <set field="invoiceEditable" from="invoice.statusId in editableStatusIds"/>
+        <set field="invoiceEditable" from="invoice.statusId in ['InvoiceInProcess', 'InvoiceIncoming', 'InvoiceReceived']"/>
 
         <entity-find entity-name="moqui.basic.Enumeration" list="itemTypeEnumList">
             <econdition field-name="enumTypeId" value="ItemType"/><order-by field-name="description"/></entity-find>
     </actions>
     <widgets>
-        <section name="AddInvoiceItemSection" condition="invoiceEditable"><widgets>
-            <container>
-                <container-dialog id="AddInvoiceItemDialog" button-text="Add Invoice Item" width="700">
-                    <form-single name="CreateInvoiceItem" transition="createInvoiceItem">
-                        <field name="invoiceId"><default-field><hidden/></default-field></field>
-                        <field name="itemTypeEnumId"><default-field title="Type">
-                            <drop-down no-current-selected-key="ItemExpense">
-                                <list-options list="itemTypeEnumList" key="${enumId}" text="${description}"/></drop-down>
-                        </default-field></field>
-                        <field name="overrideGlAccountId"><default-field title="Override GL Account">
-                            <text-line size="50" ac-transition="getGlAccountList"/></default-field></field>
-                        <field name="description"><default-field><text-line size="50"/></default-field></field>
-                        <field name="itemDate"><default-field><date-time/></default-field></field>
-                        <field name="quantity"><default-field><text-line size="4"/></default-field></field>
-                        <field name="amount"><default-field><text-line size="8"/></default-field></field>
+        <section name="AddInvoiceItemSection" condition="invoiceEditable">
+            <widgets>
+                <container>
+                    <container-dialog id="AddInvoiceItemDialog" button-text="Add Invoice Item" width="700">
+                        <form-single name="CreateInvoiceItem" transition="createInvoiceItem">
+                            <field name="invoiceId">
+                                <default-field>
+                                    <hidden/>
+                                </default-field>
+                            </field>
+                            <field name="itemTypeEnumId">
+                                <default-field title="Type">
+                                    <drop-down no-current-selected-key="ItemExpOther">
+                                        <list-options list="itemTypeEnumList" key="${enumId}" text="${description}"/>
+                                    </drop-down>
+                                </default-field>
+                            </field>
+                            <!--<field name="overrideGlAccountId">
+                                <default-field title="Override GL Account">
+                                    <text-line size="50" ac-transition="getGlAccountList"/>
+                                </default-field>
+                            </field>-->
 
-                        <field name="submitButton"><default-field title="Create Invoice Item"><submit/></default-field></field>
-                    </form-single>
-                </container-dialog>
-            </container>
-        </widgets></section>
+                            <field name="itemVatTypeId">
+                                <conditional-field condition="invoiceEditable">
+                                    <drop-down>
+                                        <entity-options key="${enumId}" text="${description}">
+                                            <entity-find entity-name="moqui.basic.Enumeration">
+                                                <econdition field-name="enumTypeId" operator="equals" value="InvItmVatType"/>
+                                            </entity-find>
+                                        </entity-options>
+                                    </drop-down>
+                                </conditional-field>
+                                <default-field title="Override GL Account">
+                                    <display-entity entity-name="moqui.basic.Enumeration" text="${description}"/>
+                                </default-field>
+                            </field>
 
-        <label text="Invoice Total: ${ec.l10n.formatCurrency(invoiceTotal, invoice.currencyUomId)}"/>
+                            <field name="description">
+                                <default-field>
+                                    <text-line placeholder="Add some description for easier orientation." size="50"/>
+                                </default-field>
+                            </field>
+                            <!--<field name="itemDate">
+                                <default-field>
+                                    <date-time format="dd.MM.yyyy" default-value="${ec.l10n.format(invoice.invoiceDate,'dd.MM.yyyy')}"/>
+                                </default-field>
+                            </field>-->
+                            <field name="itemVatRate">
+                                <default-field title="Item VAT Rate">
+                                    <text-line size="8" default-value="20"/>
+                                    <!--<render-mode>
+                                        <text type="html"><![CDATA[
+                                            <div class="input-group">
+                                                <input id=""EditInvoiceItems_itemVatRate_0" type="number" name="itemVatRate" value="${itemVatRate}" class="form-control number" min="0" max="100">
+                                            </div>
+                                            ]]>
+                                        </text>
+                                    </render-mode>-->
+                                </default-field>
+                            </field>
+
+                            <field name="itemCenterId">
+                                <conditional-field condition="invoiceEditable" title="Accounting Center">
+                                    <drop-down no-current-selected-key="" allow-empty="true">
+                                        <entity-options key="${enumId}" text="${description}">
+                                            <entity-find entity-name="moqui.basic.Enumeration">
+                                                <econdition field-name="enumTypeId" operator="equals" value="AccountingCenter"/>
+                                            </entity-find>
+                                        </entity-options>
+                                    </drop-down>
+                                </conditional-field>
+                                <default-field title="Accounting Center">
+                                    <display-entity entity-name="moqui.basic.Enumeration" text="${description}"/>
+                                </default-field>
+                            </field>
+
+                            <field name="quantity">
+                                <default-field>
+                                    <text-line placeholder="Define item quantity." default-value="1" size="4"/>
+                                </default-field>
+                            </field>
+                            <field name="amount">
+                                <default-field>
+                                    <text-line size="8"/>
+                                </default-field>
+                            </field>
+
+                            <field name="submitButton">
+                                <default-field title="Create Invoice Item">
+                                    <submit/>
+                                </default-field>
+                            </field>
+                        </form-single>
+                    </container-dialog>
+                </container>
+            </widgets>
+        </section>
+
+        <label text="${ec.l10n.localize('Invoice Total')}: ${ec.l10n.formatCurrency(invoiceTotal, invoice.currencyUomId, 2)}"/>
         <form-list name="EditInvoiceItems" list="invoiceItemList" transition="updateInvoiceItem" multi="true">
             <field name="invoiceId"><default-field><hidden/></default-field></field>
             <field name="invoiceItemSeqId"><default-field title="Item"><display/></default-field></field>
@@ -72,16 +147,49 @@ along with this software (see the LICENSE.md file). If not, see
                     <drop-down><list-options list="itemTypeEnumList" key="${enumId}" text="${description}"/></drop-down></conditional-field>
                 <default-field title="Type"><display-entity entity-name="moqui.basic.Enumeration"/></default-field>
             </field>
-            <field name="overrideGlAccountId">
+            <!--<field name="overrideGlAccountId">
                 <conditional-field condition="invoiceEditable">
                     <text-line size="50" ac-transition="getGlAccountList"/></conditional-field>
                 <default-field title="Override GL Account"><display-entity entity-name="mantle.ledger.account.GlAccount"
                         text="GlAccountNameTemplate"/></default-field>
+            </field>-->
+
+            <field name="itemVatTypeId">
+                <conditional-field condition="invoiceEditable" title="Item VAT Type">
+                    <drop-down>
+                        <entity-options key="${enumId}" text="${description}">
+                            <entity-find entity-name="moqui.basic.Enumeration">
+                                <econdition field-name="enumTypeId" operator="equals" value="InvItmVatType"/>
+                            </entity-find>
+                        </entity-options>
+                    </drop-down>
+                </conditional-field>
+                <default-field title="Item VAT Type">
+                    <display-entity entity-name="moqui.basic.Enumeration" text="${description}"/>
+                </default-field>
             </field>
-            <field name="itemDate">
+
+            <!-- temporarily hidden -->
+            <!--<field name="itemDate">
                 <conditional-field condition="invoiceEditable" title="Date"><date-time/></conditional-field>
-                <default-field title="Date"><display/></default-field>
+                <default-field title="Date"><display format="dd.MM.yyyy"/></default-field>
+            </field>-->
+
+            <field name="itemCenterId">
+                <conditional-field condition="invoiceEditable" title="Accounting Center">
+                    <drop-down no-current-selected-key="" allow-empty="true">
+                        <entity-options key="${enumId}" text="${description}">
+                            <entity-find entity-name="moqui.basic.Enumeration">
+                                <econdition field-name="enumTypeId" operator="equals" value="AccountingCenter"/>
+                            </entity-find>
+                        </entity-options>
+                    </drop-down>
+                </conditional-field>
+                <default-field title="Accounting Center">
+                    <display-entity entity-name="moqui.basic.Enumeration" text="${description}"/>
+                </default-field>
             </field>
+
             <field name="description">
                 <conditional-field condition="invoiceEditable"><text-line size="60"/></conditional-field>
                 <default-field><display/></default-field>
@@ -91,15 +199,39 @@ along with this software (see the LICENSE.md file). If not, see
                 <default-field><display/></default-field>
             </field>
             <field name="amount">
-                <conditional-field condition="invoiceEditable"><text-line size="8"/></conditional-field>
-                <default-field><display currency-unit-field="invoice.currencyUomId"/></default-field>
+                <conditional-field condition="invoiceEditable">
+                    <text-line size="8" format="#.00"/>
+                </conditional-field>
+                <default-field>
+                    <display currency-unit-field="invoice.currencyUomId"/>
+                </default-field>
+            </field>
+            <field name="itemVatRate">
+                <conditional-field condition="invoiceEditable" title="Item VAT Rate">
+                    <text-line size="8"/>
+                    <!--<render-mode>
+                        <text type="html"><![CDATA[
+                            <div class="input-group">
+                                <input id=""EditInvoiceItems_itemVatRate_0" type="number" name="itemVatRate" value="${itemVatRate}" class="form-control number" min="0" max="100">
+                            </div>
+                            ]]>
+                        </text>
+                    </render-mode>-->
+                </conditional-field>
+                <default-field  title="Item VAT Rate"><display/></default-field>
             </field>
             <field name="total" from="((quantity ?: 1) * (amount ?: 0))">
-                <default-field><display currency-unit-field="invoice.currencyUomId"/></default-field></field>
+                <conditional-field condition="invoiceEditable">
+                    <text-line disabled="true" default-value="${ec.l10n.formatCurrency(total, invoice.currencyUomId)}" format="#.00" force-number-class="true"/>
+                </conditional-field>
+                <default-field>
+                    <display/>
+                </default-field>
+            </field>
 
             <field name="deleteButton"><default-field title="">
                 <link url="deleteInvoiceItem" text="Delete" condition="invoiceEditable" confirmation="Delete this item?"
-                        parameter-map="[invoiceId:invoiceId, invoiceItemSeqId:invoiceItemSeqId]"/>
+                      parameter-map="[invoiceId:invoiceId, invoiceItemSeqId:invoiceItemSeqId]"/>
             </default-field></field>
 
             <field name="submitButton">
@@ -108,10 +240,10 @@ along with this software (see the LICENSE.md file). If not, see
             </field>
 
             <form-list-column><field-ref name="invoiceItemSeqId"/></form-list-column>
-            <form-list-column><field-ref name="itemTypeEnumId"/><field-ref name="overrideGlAccountId"/></form-list-column>
-            <form-list-column><field-ref name="itemDate"/><field-ref name="description"/></form-list-column>
+            <form-list-column><field-ref name="itemTypeEnumId"/><!--<field-ref name="overrideGlAccountId"/>--><field-ref name="itemVatTypeId"/></form-list-column>
+            <form-list-column><!--<field-ref name="itemDate"/>--><field-ref name="itemCenterId"></field-ref><field-ref name="description"/></form-list-column>
             <form-list-column><field-ref name="quantity"/><field-ref name="amount"/></form-list-column>
-            <form-list-column><field-ref name="total"/></form-list-column>
+            <form-list-column><field-ref name="total"/><field-ref name="itemVatRate"/></form-list-column>
             <form-list-column><field-ref name="deleteButton"/></form-list-column>
         </form-list>
     </widgets>

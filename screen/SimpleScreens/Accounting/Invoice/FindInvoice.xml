@@ -12,277 +12,561 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns=""
         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
         default-menu-include="false">
 
+    <macro-template type="html" location="template/screen-macro/econScreenMacros.html.ftl"/>
+
+    <parameter name="toPartyId"/>
+
     <transition name="findInvoice"><default-response url="."/></transition>
     <transition name="editInvoice"><default-response url="../EditInvoice"/></transition>
-
     <transition name="createInvoice"><service-call name="mantle.account.InvoiceServices.create#Invoice"/>
         <default-response url="../EditInvoice"/></transition>
     <transition name="createProjectInvoiceItems"><service-call name="mantle.account.InvoiceServices.create#ProjectInvoiceItems"/><default-response url="."/></transition>
+    <transition name="createMultiplePayments">
+        <service-call ignore-error="true" name="mantle.account.PaymentServicesEnhancements.create#Payments"
+                      in-map="context + [invoiceList:invoiceList]"/>
+        <default-response type="screen-last" />
+    </transition>
+    <transition name="createMultiplePaymentsByIteration" begin-transaction="true">
+        <actions>
+            <if condition="createPayment">
+                <!-- FIND COMPANY'S ACCOUNT -->
+                <service-call name="mantle.account.PaymentMethodServicesEnhancements.get#PartyPaymentMethodId"
+                              in-map="[partyId:toPartyId]"
+                              out-map="companyAccountToDebit"/>
+                <!-- paymentMethodTypeEnumId:'PmtBankAccount' -->
 
-    <transition name="getOpenClientInvoicesByProject">
-        <actions>
-            <entity-find entity-name="mantle.work.effort.WorkEffortParty" list="billToList">
-                <date-filter/><econdition field-name="workEffortId"/>
-                <econdition field-name="roleTypeId" value="CustomerBillTo"/>
-            </entity-find>
-            <set field="billToWep" from="billToList ? billToList[0] : null"/>
-            <entity-find entity-name="mantle.work.effort.WorkEffortParty" list="billFromList">
-                <date-filter/><econdition field-name="workEffortId"/>
-                <econdition field-name="roleTypeId" value="VendorBillFrom"/>
-            </entity-find>
-            <set field="billFromWep" from="billFromList ? billFromList[0] : null"/>
+                <set field="partyIdToDebit_IncorrectAccount" value=""/>
 
-            <entity-find entity-name="mantle.account.invoice.Invoice" list="invoiceList">
-                <econdition field-name="invoiceTypeEnumId" value="InvoiceSales"/>
-                <econdition field-name="statusId" value="InvoiceInProcess"/>
-                <econdition field-name="toPartyId" from="billToWep?.partyId" ignore-if-empty="true"/>
-                <econdition field-name="fromPartyId" from="billFromWep?.partyId" ignore-if-empty="true"/>
-            </entity-find>
-            <set field="resultList" from="[[invoiceId:'', label:'New']]"/>
-            <iterate list="invoiceList" entry="invoice">
-                <script>resultList.add([invoiceId:invoice.invoiceId, label:"#${invoice.invoiceId}: ${invoice.invoiceDate}"])</script>
-            </iterate>
-            <script>ec.web.sendJsonResponse(resultList)</script>
+                <if condition="companyAccountToDebit.bankAccount==null">
+                    <message error="false">Debit account missing. Fill it in, please.</message>
+                    <set field="partyIdToDebit_IncorrectAccount" from="toPartyId"/>
+                    <else>
+                        <set field="partyIdToDebit_IncorrectAccount" from="null"/>
+                    </else>
+                </if>
+
+                <!-- Find company's party information -->
+                <service-call name="mantle.party.PartyServicesEnhancements.findDetails#Party" in-map="[partyId:toPartyId]" out-map="partyToDebit"/>
+
+                <!-- FIND SUPPLIER'S ACCOUNT -->
+                <service-call name="mantle.account.PaymentMethodServicesEnhancements.get#PartyPaymentMethodId"
+                              in-map="[partyId:fromPartyId]"
+                              out-map="companyAccountToCredit" ignore-error="false"/>
+
+                <if condition="companyAccountToCredit.bankAccount==null">
+                    <!--<message error="false">Credit account missing. Fill it in, please.</message>-->
+                    <set field="partyIdToCredit_IncorrectAccount" from="fromPartyId"/>
+                    <else>
+                        <set field="partyIdToCredit_IncorrectAccount" from="null"/>
+                    </else>
+                </if>
+
+                <!-- Find supplier's party information -->
+                <service-call name="mantle.party.PartyServicesEnhancements.findDetails#Party" in-map="[partyId:fromPartyId]" out-map="partyToCredit"/>
+
+                <if condition="partyIdToDebit_IncorrectAccount != null">
+                    <return message="Incorrect accounts setup."/>
+                </if>
+
+                <set field="cleanReferenceNumber" from="org.moqui.impl.ViUtilities.removeNonumericCharacters(referenceNumber).padLeft(10,'0').substring(0, 10)"/>
+
+                <service-call name="mantle.account.PaymentServices.create#InvoicePayment"
+                              in-map="context +
+                              [
+                                cdtIBAN:companyAccountToCredit?.bankAccount?.accountNumber,
+                                cdtBIC:companyAccountToCredit?.bankAccount?.routingNumber,
+                                cdtBank:companyAccountToCredit?.bankAccount?.bankName,
+                                dbtIBAN:companyAccountToDebit.bankAccount.accountNumber,
+                                dbtBIC:companyAccountToDebit?.bankAccount?.routingNumber,
+                                dbtBank:companyAccountToDebit?.bankAccount?.bankName,
+                                cdtParty:partyToCredit?.organizationName?:'N/a',
+                                cdtPartyStreet:partyToCredit?.partyInfoData?.address1?:'',
+                                cdtPartyNumber:partyToCredit?.partyInfoData?.unitNumber?:'',
+                                cdtPartyCity:partyToCredit?.partyInfoData?.city?:'',
+                                cdtPartyZIP:partyToCredit?.partyInfoData?.postalCode?:'',
+                                cdtPartyCountry:partyToCredit?.partyInfoData?.countryGeoId?:'',
+                                dbtParty:partyToDebit?.organizationName?:'N/a',
+                                paymentInstrumentEnumId:'PiCompanyAccount',
+                                statusId:'PmntAuthorized',
+                                variableSymbol:cleanReferenceNumber
+                              ]"
+                              out-map="context"
+                              ignore-error="false"/>
+            </if>
+
+            <if condition="exportXML">
+                <entity-find-one entity-name="mantle.account.payment.PaymentApplicationAndInvoice" value-field="payment"/>
+            </if>
         </actions>
-        <default-response type="none"/>
+
+        <!-- export XML file, still da old way -->
+        <conditional-response url="../../Payment/PaymentSEPA" url-type="plain" parameter-map="[renderMode:'csv', paymentId:paymentId]">
+            <condition><expression>exportXML &amp;&amp; payment != null </expression></condition>
+        </conditional-response>
+
+        <!-- Open the payment, if the paymentId is not null -->
+        <conditional-response url="../../Payment/EditPayment" parameter-map="[paymentId:paymentId]">
+            <condition><expression>createPayment &amp;&amp; paymentId != null</expression></condition>
+        </conditional-response>
+
+        <!-- Open the supplier and edit him -->
+        <conditional-response url="../../../Supplier/EditSupplier" parameter-map="[partyId:partyIdToDebit_IncorrectAccount]">
+            <condition><expression>createPayment &amp;&amp; partyIdToDebit_IncorrectAccount != null</expression></condition>
+        </conditional-response>
+
+        <!--<conditional-response url="../../../Suppliers/EditSupplier" parameter-map="[partyId:partyIdToCredit_IncorrectAccount]">
+            <condition><expression>createPayment &amp;&amp; partyIdToCredit_IncorrectAccount != null</expression></condition>
+        </conditional-response>-->
+
+        <default-response type="screen-last"/>
+        <error-response type="screen-last"/>
     </transition>
-    <transition name="getProjectParties">
+    <transition-include name="getPartyList" location="component://SimpleScreens/template/party/PartyForms.xml"/>
+
+    <transition name="multipleApproval" read-only="true">
+        <service-call name="update#mantle.account.invoice.Invoice" in-map="[invoiceId:invoiceId,statusId:'InvoiceApproved']"/>
+
+        <default-response type="screen-last"/>
+    </transition>
+    <transition name="openContent" read-only="true">
+        <parameter name="invoiceContentLocation"/>
         <actions>
-            <service-call name="mantle.work.ProjectServices.get#ProjectParties" out-map="context"
-                    in-map="[rootWorkEffortId:workEffortId, addOptional:'false']"/>
-            <script>ec.web.sendJsonResponse(resultList)</script>
+            <if condition="invoiceContentLocation!=null">
+                <log message="Opening via service using location ${invoiceContentLocation}." level="info"/>
+
+                <service-call name="mantle.account.InvoiceServicesEnhancements.open#InvoiceContent" in-map="[invoiceContentLocation:invoiceContentLocation]"/>
+            </if>
         </actions>
         <default-response type="none"/>
     </transition>
-    <transition name="getOpenVendorInvoicesByFromParty">
-        <actions>
-            <entity-find entity-name="mantle.account.invoice.Invoice" list="invoiceList">
-                <econdition field-name="invoiceTypeEnumId" value="InvoiceSales"/>
-                <econdition field-name="statusId" operator="in" value="InvoiceIncoming,InvoiceReceived"/>
-                <econdition field-name="fromPartyId" from="workerPartyId"/>
-            </entity-find>
-            <set field="resultList" from="[[invoiceId:'', label:'New']]"/>
-            <iterate list="invoiceList" entry="invoice">
-                <script>resultList.add([invoiceId:invoice.invoiceId, label:"#${invoice.invoiceId}: ${invoice.invoiceDate}"])</script>
-            </iterate>
-            <script>ec.web.sendJsonResponse(resultList)</script>
-        </actions>
+
+    <transition name="getTagsInUse" read-only="true">
+        <service-call name="mantle.account.InvoiceServicesEnhancements.getTagsInUse#Invoice" web-send-json-response="true"/>
         <default-response type="none"/>
     </transition>
+
+    <transition name="deleteAllTags" read-only="true">
+        <service-call name="mantle.account.InvoiceServicesEnhancements.deleteTags#Invoice" web-send-json-response="true" in-map="[invoiceId:invoiceId]"/>
+        <default-response type="none"/>
+    </transition>
+
+    <transition name="addTag" read-only="true">
+        <service-call name="mantle.account.InvoiceServicesEnhancements.addTag#Invoice" web-send-json-response="true" in-map="[invoiceId:invoiceId,tag:tag]"/>
+
+        <error-response type="none"/>
+        <default-response type="none"/>
+    </transition>
+
+    <pre-actions>
+        <script>html_scripts.add("/libs/jquery/jquery-ui.min.js")</script>
+        <script>html_scripts.add("/ssstatic/lib/typeahead/bloodhound.js")</script>
+        <script>html_scripts.add("/ssstatic/lib/typeahead/typeahead.bundle.js")</script>
+        <script>html_scripts.add("/ssstatic/lib/typeahead/typeahead.bundle.min.js")</script>
+        <script>html_scripts.add("/ssstatic/lib/typeahead/typeahead.jquery.js")</script>
+        <script>html_scripts.add("/ssstatic/lib/bootstrap-tagsinput/bootstrap-tagsinput.js")</script>
+        <script>html_stylesheets.add("/ssstatic/lib/bootstrap-tagsinput/bootstrap-tagsinput.css")</script>
+        <script>html_stylesheets.add("/ssstatic/lib/bootstrap-tagsinput/bootstrap-tagsinput-typeahead.css")</script>
+    </pre-actions>
 
     <actions>
-        <entity-find entity-name="mantle.account.invoice.Invoice" list="invoiceList">
-            <search-form-inputs default-order-by="-invoiceDate,+invoiceId">
-                <default-parameters statusId="InvoiceInProcess,InvoiceFinalized,InvoiceSent,InvoiceIncoming,InvoiceReceived,InvoiceApproved"
-                        statusId_op="in" invoiceDate_poffset="-1" invoiceDate_period="30d"/></search-form-inputs>
+        <!--fill in partyId if not called from upper-->
+        <script>
+            <![CDATA[
+                if (!toPartyId) {
+                    toPartyId = 'HS'
+
+                    //log change of parameter
+                    ec.logger.warn("Changing toPartyId parameter to ${toPartyId} from notSet.")
+                }
+            ]]>
+        </script>
+
+        <!--load internal organization to fill toPartyId list-->
+        <entity-find entity-name="mantle.party.PartyDetailAndRole" list="orgInternalList">
+            <econdition field-name="roleTypeId" value="OrgInternal"/>
+            <econdition field-name="disabled" value="N" or-null="true"/>
+            <order-by field-name="organizationName,firstName"/>
         </entity-find>
+
+        <!--search options enhanced (prices)-->
+        <service-call name="mantle.account.InvoiceSearch.findEnhanced#Invoice" in-map="context + [invoiceTotal:org.moqui.util.StringUtilities.encodeForXmlAttribute(invoiceTotal?:''),leadingWildcard:true,pageSize:60]" out-map="context"/>
+
+        <set field="cumulativeTotal" from="0"/>
+
+        <actions>
+            <iterate list="invoiceList" entry="singleInvoice">
+                <script>
+                    cumulativeTotal += singleInvoice.invoiceItemTotal?:0
+                </script>
+            </iterate>
+        </actions>
     </actions>
+
     <widgets>
-        <container>
-            <!--
-            <container-dialog id="FindInvoiceDialog" button-text="Search Invoices" width="700">
-                <form-single name="FindInvoice" transition="findInvoice">
-                    <field name="fromPartyId"><default-field title="From">
-                        <drop-down allow-empty="true">
-                            <entity-options key="${partyId}" text="${organizationName?:''} ${firstName?:''} ${lastName?:''} [${partyId}]">
-                                <entity-find entity-name="mantle.party.PartyDetailAndRole">
-                                    <econdition field-name="roleTypeId" operator="in" value="Supplier,Vendor,VendorBillFrom,OrgInternal"/>
-                                    <econdition field-name="disabled" value="N" or-null="true"/>
-                                </entity-find>
-                            </entity-options>
-                        </drop-down>
-                    </default-field></field>
-                    <field name="toPartyId"><default-field title="To">
-                        <drop-down allow-empty="true">
-                            <entity-options key="${partyId}" text="${organizationName?:''} ${firstName?:''} ${lastName?:''} [${partyId}]">
-                                <entity-find entity-name="mantle.party.PartyDetailAndRole">
-                                    <econdition field-name="roleTypeId" operator="in" value="Customer,CustomerBillTo,OrgInternal"/>
-                                    <econdition field-name="disabled" value="N" or-null="true"/>
-                                </entity-find>
-                            </entity-options>
-                        </drop-down>
-                    </default-field></field>
-                    <field name="invoiceTypeEnumId"><default-field title="Type">
-                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                            <set field="enumTypeId" value="InvoiceType"/><set field="noCurrentSelectedKey" value="InvoiceSales"/></widget-template-include>
-                    </default-field></field>
-                    <field name="invoiceDate"><default-field><date-find type="timestamp"/></default-field></field>
-                    <field name="statusId"><default-field title="Status">
-                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#statusDropDown">
-                            <set field="statusTypeId" value="Invoice"/><set field="allowEmpty" value="true"/></widget-template-include>
-                    </default-field></field>
-                    <field name="referenceNumber"><default-field><text-line size="20"/></default-field></field>
-                    <field name="searchButton"><default-field title="Find"><submit/></default-field></field>
-                </form-single>
-            </container-dialog>
-            -->
+        <form-list name="InvoiceList"
+                   list="invoiceList"
+                   skip-form="false"
+                   multi="false"
+                   transition="createMultiplePaymentsByIteration"
+                   show-csv-button="true"
+                   button-content-to-display="true"
+                   show-all-button="true" paginate-always-show="true">
 
-            <container-dialog id="NewInvoiceDialog" button-text="New Invoice">
-                <form-single name="NewInvoiceForm" transition="createInvoice">
-                    <field name="fromPartyId"><default-field title="From">
-                        <drop-down>
-                            <entity-options key="${partyId}" text="PartyNameTemplate">
-                                <entity-find entity-name="mantle.party.PartyDetailAndRole">
-                                    <econdition field-name="roleTypeId" operator="in" value="Supplier,Vendor,VendorBillFrom,OrgInternal"/>
-                                    <econdition field-name="disabled" value="N" or-null="true"/>
-                                    <order-by field-name="organizationName,firstName"/></entity-find></entity-options>
-                        </drop-down>
-                    </default-field></field>
-                    <field name="toPartyId"><default-field title="To">
-                        <drop-down>
-                            <entity-options key="${partyId}" text="PartyNameTemplate">
-                                <entity-find entity-name="mantle.party.PartyDetailAndRole">
-                                    <econdition field-name="roleTypeId" operator="in" value="Customer,CustomerBillTo,OrgInternal"/>
-                                    <econdition field-name="disabled" value="N" or-null="true"/>
-                                    <order-by field-name="organizationName,firstName"/></entity-find></entity-options>
-                        </drop-down>
-                    </default-field></field>
-                    <field name="invoiceTypeEnumId"><default-field title="Type">
-                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                            <set field="enumTypeId" value="InvoiceType"/><set field="noCurrentSelectedKey" value="InvoiceSales"/></widget-template-include>
-                    </default-field></field>
-                    <!-- set based on PartyAcctgPreference.baseCurrencyUomId, for now same for all org invoices:
-                    <field name="currencyUomId"><default-field title="Currency">
-                        <drop-down no-current-selected-key="USD"><entity-options key="${uomId}" text="UomNameTemplate">
-                            <entity-find entity-name="moqui.basic.Uom">
-                                <econdition field-name="uomTypeEnumId" value="UT_CURRENCY_MEASURE"/>
-                                <order-by field-name="description"/>
-                            </entity-find>
-                        </entity-options></drop-down>
-                    </default-field></field>
-                    -->
-                    <field name="referenceNumber"><default-field tooltip="Other party invoice reference number">
-                        <text-line size="20"/></default-field></field>
-                    <field name="invoiceDate" from="ec.user.nowTimestamp"><default-field><date-time/></default-field></field>
-
-                    <field name="submitButton"><default-field title="Create"><submit/></default-field></field>
-                </form-single>
-            </container-dialog>
-
-            <container-dialog id="ProjectInvoiceDialog" button-text="Invoice Project Client" width="700">
-                <form-single name="ProjectInvoice" transition="createProjectInvoiceItems">
-                    <field name="workEffortId"><default-field title="Project">
-                        <drop-down allow-empty="false" combo-box="false">
-                            <entity-options key="${workEffortId}" text="${workEffortId} - ${workEffortName}">
-                                <entity-find entity-name="mantle.work.effort.WorkEffort">
-                                    <econdition field-name="workEffortTypeEnumId" value="WetProject"/>
-                                    <order-by field-name="workEffortId"/>
-                                </entity-find>
-                            </entity-options>
-                        </drop-down>
-                    </default-field></field>
-
-                    <field name="thruDate"><default-field><date-time type="date-time"/></default-field></field>
-                    <field name="invoiceId"><default-field title="Existing Invoice">
-                        <drop-down><dynamic-options transition="getOpenClientInvoicesByProject" value-field="invoiceId" label-field="label">
-                            <depends-on field="workEffortId"/></dynamic-options></drop-down>
-                    </default-field></field>
-                    <field name="submitButton"><default-field title="Invoice Time and Expenses"><submit/></default-field></field>
-                </form-single>
-            </container-dialog>
-
-            <container-dialog id="WorkerInvoiceDialog" button-text="Worker Invoice" width="700">
-                <form-single name="WorkerInvoice" transition="createProjectInvoiceItems">
-                    <field name="ratePurposeEnumId"><default-field><hidden default-value="RaprVendor"/></default-field></field>
-                    <field name="workEffortId"><default-field title="Project">
-                        <drop-down allow-empty="false" combo-box="false">
-                            <entity-options key="${workEffortId}" text="${workEffortId} - ${workEffortName}">
-                                <entity-find entity-name="mantle.work.effort.WorkEffort">
-                                    <econdition field-name="workEffortTypeEnumId" value="WetProject"/>
-                                    <order-by field-name="workEffortId"/>
-                                </entity-find>
-                            </entity-options>
-                        </drop-down>
-                    </default-field></field>
-                    <field name="workerPartyId"><default-field title="Worker">
-                        <drop-down><dynamic-options transition="getProjectParties" value-field="partyId" label-field="name">
-                            <depends-on field="workEffortId"/></dynamic-options></drop-down>
-                    </default-field></field>
-
-                    <field name="thruDate"><default-field><date-time type="date-time"/></default-field></field>
-                    <field name="invoiceId"><default-field title="Existing Invoice">
-                        <drop-down><dynamic-options transition="getOpenVendorInvoicesByFromParty" value-field="invoiceId" label-field="label">
-                            <depends-on field="workerPartyId"/></dynamic-options></drop-down>
-                    </default-field></field>
-                    <field name="submitButton"><default-field title="Invoice Time"><submit/></default-field></field>
-                </form-single>
-            </container-dialog>
-        </container>
-
-        <form-list name="InvoiceList" list="invoiceList" skip-form="true" header-dialog="true" select-columns="true"
-                   saved-finds="true" show-csv-button="true">
             <row-actions>
                 <service-call name="mantle.account.InvoiceServices.get#InvoiceTotal" in-map="[invoiceId:invoiceId]" out-map="context"/>
+                <service-call name="mantle.account.InvoiceServicesEnhancements.get#InvoiceContentToDisplay" in-map="[invoiceId:invoiceId]" out-map="context"/>
             </row-actions>
-            <field name="editInvoiceLink"><header-field show-order-by="case-insensitive" title="Edit"/><default-field>
-                <link url="editInvoice" text="Edit ${invoiceId}" link-type="anchor"/>
-            </default-field></field>
-            <field name="invoiceTypeEnumId">
-                <header-field title="Type" show-order-by="true">
-                    <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                        <set field="enumTypeId" value="InvoiceType"/><set field="allowEmpty" value="true"/>
-                        <set field="style" value=" "/><set field="allowMultiple" value="true"/></widget-template-include>
-                </header-field>
-                <default-field><display-entity entity-name="moqui.basic.Enumeration"/></default-field>
-            </field>
-            <field name="referenceNumber"><header-field><text-find size="10" hide-options="true"/></header-field>
-                <default-field><display/></default-field></field>
-            <field name="fromPartyId">
-                <header-field title="From"><drop-down allow-empty="true">
-                    <entity-options key="${partyId}" text="PartyNameTemplate">
-                        <entity-find entity-name="mantle.party.PartyDetailAndRole">
-                            <econdition field-name="roleTypeId" operator="in" value="Supplier,Vendor,VendorBillFrom,OrgInternal"/>
-                            <econdition field-name="disabled" value="N" or-null="true"/>
-                            <order-by field-name="organizationName,firstName"/>
-                        </entity-find>
-                    </entity-options>
-                </drop-down></header-field>
+
+            <field name="invoiceId">
                 <default-field>
-                    <display-entity entity-name="mantle.party.PartyDetail" text="PartyNameTemplate"/>
-                    <!-- <link url="editParty" entity-name="mantle.party.PartyDetail" text="PartyNameTemplate"
-                        link-type="anchor" parameter-map="[partyId:fromPartyId]"/> -->
+                    <hidden/>
                 </default-field>
             </field>
+
             <field name="toPartyId">
-                <header-field title="To"><drop-down allow-empty="true">
-                    <entity-options key="${partyId}" text="PartyNameTemplate">
-                        <entity-find entity-name="mantle.party.PartyDetailAndRole">
-                            <econdition field-name="roleTypeId" operator="in" value="Customer,CustomerBillTo,OrgInternal"/>
-                            <econdition field-name="disabled" value="N" or-null="true"/>
-                            <order-by field-name="organizationName,firstName"/>
-                        </entity-find>
-                    </entity-options>
-                </drop-down></header-field>
+                <header-field title="Company">
+                    <drop-down size="1">
+                        <list-options list="orgInternalList" key="${partyId}" text="${pseudoId}"/>
+                    </drop-down>
+                </header-field>
                 <default-field>
-                    <display-entity entity-name="mantle.party.PartyDetail" text="PartyNameTemplate"/>
-                    <!-- <link url="editParty" entity-name="mantle.party.PartyDetail" text="PartyNameTemplate"
-                        link-type="anchor" parameter-map="[partyId:toPartyId]"/> -->
+                    <display text=""/>
                 </default-field>
             </field>
-            <field name="invoiceDate"><header-field show-order-by="true"><date-period/></header-field>
-                <default-field><display also-hidden="false"/></default-field></field>
-            <field name="dueDate"><header-field show-order-by="true"><date-period/></header-field>
-                <default-field><display/></default-field></field>
+
+            <field name="invoiceTypeEnumId">
+                <default-field title="">
+                    <econ-docs-tags-display/>
+                </default-field>
+            </field>
+
+            <field name="referenceNumber">
+                <header-field>
+                    <text-find size="7" hide-options="true"/>
+                </header-field>
+                <default-field>
+                    <display/>
+                </default-field>
+            </field>
+
+            <field name="fromPartyId">
+                <header-field title="From">
+                    <text-line ac-transition="getPartyList" ac-min-length="2" size="25" parameter-map="[roleTypeId:'Supplier,OrgInternal']"/>
+                </header-field>
+
+                <default-field>
+                    <display-entity entity-name="mantle.party.PartyDetail" text="PartyNameOnlyTemplate"/>
+                </default-field>
+            </field>
+
+            <field name="approvalButton">
+                <default-field title="">
+                    <link url="multipleApproval"
+                          condition="statusId=='InvoiceReceived'"
+                          icon="glyphicon glyphicon-ok"
+                          link-type="anchor-button"
+                          tooltip="By clicking this button, you approve the selected invoice."/>
+                </default-field>
+            </field>
+
+            <field name="invoiceContentLocation">
+                <default-field title="">
+                    <link url="openContent"
+                          condition="context.invoiceContentLocation!=null"
+                          icon="glyphicon glyphicon-file"
+                          link-type="anchor-button"
+                          target-window="_blank"
+                          parameter-map="[invoiceContentLocation:context.invoiceContentLocation]"
+                          tooltip="Open attachment of the selected invoice."
+                    />
+                </default-field>
+            </field>
+
+            <field name="dueDate">
+                <header-field>
+                </header-field> <!-- deleted <date-period/> -->
+                <default-field>
+                    <display format="dd.MM.yyyy"/>
+                </default-field>
+            </field>
+
             <field name="statusId">
                 <header-field title="Status" show-order-by="true">
                     <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#statusDropDown">
-                        <set field="statusTypeId" value="Invoice"/><set field="allowMultiple" value="true"/></widget-template-include>
+                        <set field="statusTypeId" value="Invoice"/><set field="allowMultiple" value="true"/>
+                    </widget-template-include>
                 </header-field>
-                <default-field><display-entity entity-name="moqui.basic.StatusItem" also-hidden="false"/></default-field>
+                <default-field>
+                    <display-entity entity-name="moqui.basic.StatusItem" also-hidden="false"/>
+                </default-field>
             </field>
-            <field name="invoiceTotal"><header-field title="Find"><submit/></header-field>
-                <default-field title="Total"><display currency-unit-field="currencyUomId"/></default-field></field>
 
-            <form-list-column><field-ref name="editInvoiceLink"/></form-list-column>
-            <form-list-column><field-ref name="invoiceTypeEnumId"/><field-ref name="referenceNumber"/></form-list-column>
-            <form-list-column><field-ref name="fromPartyId"/><field-ref name="toPartyId"/></form-list-column>
-            <form-list-column><field-ref name="invoiceDate"/><field-ref name="dueDate"/></form-list-column>
-            <form-list-column><field-ref name="statusId"/></form-list-column>
-            <form-list-column><field-ref name="invoiceTotal"/></form-list-column>
+            <field name="manualCategory">
+                <header-field show-order-by="true">
+                    <text-find size="10" hide-options="true"/>
+                </header-field>
+
+                <default-field container-style="manual-category-fieldset">
+                    <render-mode>
+                        <text type="html">
+                            <![CDATA[
+                                <!-- show add tag input button -->
+                                <div style="display:inline;"><button type="button" id="buttonShowAddInput_${invoiceId}" data-invoiceid="${invoiceId}" class="btn btn-primary btn-xs tag-manipulation-btn-add" title="Add new tag." onclick="onSpanClickAdd(this)">+</button></div>
+
+                                <!-- edit button -->
+                                <!-- <div class="tag-manipulation-btn" style="display:none;"><span class="label label-default tag-manipulation-btn" data-invoiceid="${invoiceId}" onclick="onSpanClickEdit(this)">edit</span></div> -->
+
+                                <!-- delete button -->
+                                <div class="tag-manipulation-btn" style="display:none;"><button type="button" id="buttonDeleteTag_${invoiceId}" class="btn btn-danger btn-xs tag-delete-btn" title="Remove all tags." data-invoiceid="${invoiceId}">-</span></div>
+
+                                <!-- add text input -->
+                                <div style="display:none;"><input type="text" id="inputAddTag_${invoiceId}" class="form-control" placeholder="add tag"/></div>
+
+                                <!-- add button = OK -->
+                                <div style="display:none;"><button type="button" id="buttonAddTag_${invoiceId}" data-invoiceid="${invoiceId}" class="btn btn-primary btn-xs" onclick="onButtonClickAdd(this)">OK</button></div>
+
+                                <!-- cancel add button -->
+                                <div style="display:none;"><button type="button" id="buttonCancelAddTag_${invoiceId}" class="btn btn-warning btn-xs" >X</button></div>
+                            ]]>
+                        </text>
+                    </render-mode>
+
+                    <tags-display max-tags="3" default-more-sign=".."/>
+                </default-field>
+            </field>
+
+            <!-- New 27.9. -->
+            <field name="invoiceCenterId">
+                <header-field title="Accounting Center">
+                    <drop-down no-current-selected-key="" allow-empty="true" allow-multiple="true" size="1">
+                        <entity-options key="${enumId}" text="${description}">
+                            <entity-find entity-name="moqui.basic.Enumeration">
+                                <econdition field-name="enumTypeId" operator="equals" value="AccountingCenter"/>
+                            </entity-find>
+                        </entity-options>
+                    </drop-down>
+                </header-field>
+                <default-field title="Accounting Center">
+                    <display-entity entity-name="moqui.basic.Enumeration" text="${description}"/>
+                </default-field>
+            </field>
+
+            <field name="invoiceTotal">
+                <header-field>
+                    <text-line size="10"/>
+                    <render-mode>
+                        <text type="html">
+                            <![CDATA[
+                                <span class="label label-warning" data-toggle="tooltip" title="Hint:&#013;use '.' not ',' for decimals 201.2 not 201,2&#013;use =to display invoices with total equal to specified value&#013;use > to display invoices with total greater than specified value&#013;use < to display invoices with total lesser than specified value&#013;use >= to display invoices with total greater or equal than specified value&#013;use <= to display invoices with total lesser or equal than specified value&#013;">i</span>
+                            ]]>
+                        </text>
+                    </render-mode>
+                </header-field>
+                <default-field title="Total">
+                    <link
+                            url="editInvoice"
+                            text="${ec.l10n.formatCurrency(invoiceItemTotal, currencyUomId, 2)}"
+                            link-type="anchor"
+                            tooltip="Open for editing."/>
+                    <!--<display currency-unit-field="currencyUomId"/>-->
+                </default-field>
+            </field>
+
+            <field name="emptyColumn">
+                <header-field title="Find">
+                    <submit/>
+                </header-field>
+                <default-field>
+                    <display text=""/>
+                </default-field>
+            </field>
         </form-list>
+
+        <render-mode>
+            <text type="html">
+                <![CDATA[
+                    <script>
+                        $(window).load(function() {
+                            //executes when complete page is fully loaded, including all frames, objects and images
+                            document.getElementById('InvoiceList_TotalsDisplay_input').value = 'Sum = ' + ${ec.l10n.format(cumulativeTotal, '0.00')};
+
+                            //get all fieldsets related to manual category tags
+                            $(".manual-category-fieldset").each(function(index) {
+                                var tagvalue = $(this).children(".label-info")[0]
+
+                                if (tagvalue.innerHTML) {
+                                    $(this).children(".tag-manipulation-btn").css("display","inline");
+                                };
+                            });
+                        });
+
+                        function onSpanClickAdd(span) {
+                            var invoiceid = $(span).attr("data-invoiceid")
+                            var invoiceid_inputid = "inputAddTag_" + invoiceid
+                            var invoiceid_addbuttonid = "buttonAddTag_" + invoiceid
+                            var invoiceid_canceladdbuttonid = "buttonCancelAddTag_" + invoiceid
+
+                            //test whether the input is show or not
+                            var tagshown = $(span).attr("shown")
+
+                            if (tagshown=="yes") {
+                                $('#' + invoiceid_inputid).parent().css("display","none");
+                                $('#' + invoiceid_addbuttonid).parent().css("display","none");
+
+                                //mark
+                                $(span).attr("shown", "no")
+                            } else {
+                                //display input and buttons
+                                $('#' + invoiceid_inputid).parent().css("display","inline");
+                                $('#' + invoiceid_addbuttonid).parent().css("display","inline");
+                                //$('#' + invoiceid_canceladdbuttonid).parent().css("display","inline");
+
+                                //mark
+                                $(span).attr("shown", "yes")
+                            }
+                        };
+
+                        function onSpanClickEdit(span) {
+                            //console.log($(span).attr("data-invoiceid"))
+                        };
+
+                        $('.tag-delete-btn').on('click', function(e){
+                            //this should be loaded via a service, not from HTML elements
+                            var tags = $(e.delegateTarget).parent().parent().children(".label-info")
+                            var tagsvalue = new Array()
+
+                            $(tags).each(function() {
+                                //console.log("tag = " + $(this).text());
+
+                                //ignore empty strings
+                                if ($(this).text()!='') {
+                                    tagsvalue.push($(this).text())
+                                }
+                            })
+
+                            confirmDialog("${ec.l10n.localize('Really want to delete all tags')} '" + tagsvalue.toString() + "'?", function(){
+                                //console.log("$(e.delegateTarget.attr('data-invoiceid')) = " + $(e.delegateTarget).attr("data-invoiceid"));
+
+                                onSpanClickDelete(e.delegateTarget);
+                            });
+                        });
+
+                        function confirmDialog(message, onConfirm){
+                            var fClose = function(){
+                                modal.modal("hide");
+                            };
+
+                            var modal = $("#myModal");
+                            modal.modal("show");
+                            $("#confirmMessage").empty().append(message);
+                            $("#confirmHeader").empty().append("Confirmation");
+                            $("#confirmOk").one('click', onConfirm);
+                            $("#confirmOk").one('click', fClose);
+                            $("#confirmCancel").one("click", fClose);
+                        }
+
+                        function onSpanClickDelete(span) {
+                            //console.log($(span).attr("data-invoiceid"))
+                            invoiceid = $(span).attr("data-invoiceid")
+
+                            $.ajax({
+                                dataType: "json",
+                                url: "${sri.buildUrl('deleteAllTags').url}",
+                                data: {invoiceId:$(span).attr("data-invoiceid")},
+                                success: eraseSpanElement (span)
+                            });
+                        };
+
+                        function onButtonClickAdd(span) {
+                            //console.log($(span).attr("data-invoiceid"))
+                            invoiceid = $(span).attr("data-invoiceid")
+                            newtag = $('#inputAddTag_' + invoiceid).val()
+
+                            $.ajax({
+                                dataType: "json",
+                                url: "${sri.buildUrl('addTag').url}",
+                                data: {
+                                    invoiceId:invoiceid,
+                                    tag:newtag
+                                    },
+                                success: function (data) {
+                                    createNewTagElement(span, newtag, invoiceid)
+                                },
+                                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                                    errorCreatingNewElement(errorThrown)
+                                }
+                            });
+                        };
+
+                        //function that displays a new label, once it is created
+                        //plus shows the minus/delete button
+                        function createNewTagElement(spanElement, newtag, invoiceid) {
+                            //show tag
+                            $(spanElement).parent().parent().append("<span class='label label-info'>" + newtag + "</span>")
+
+                            //erase text
+                            var invoiceid_inputid = "inputAddTag_" + invoiceid
+                            $('#' + invoiceid_inputid).val("");
+
+                            //display delete button
+                            var invoiceid_deletebuttonid = "buttonDeleteTag_" + invoiceid
+                             $('#' + invoiceid_deletebuttonid).parent().css("display","inline");
+                        };
+
+                        //function that logs error, should it occur
+                        function errorCreatingNewElement(errorThrown) {
+                            console.log(errorThrown)
+                        }
+
+                        //function that hides labels, once they are deleted
+                        function eraseSpanElement(spanElement) {
+                            //hide label itself
+                            $(spanElement).parent().siblings(".label-info").hide()
+
+                            //hide buttons
+                            $(spanElement).parent().siblings(".tag-manipulation-btn").hide()
+
+                            //hide calling button itself
+                            $(spanElement).parent().hide()
+                        };
+                    </script>
+
+                    <!-- Modal -->
+                    <div id="myModal" class="modal fade" role="dialog">
+                        <div class="modal-dialog">
+
+                            <!-- Modal content-->
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                    <h4 id="confirmHeader" class="modal-title">Modal Header</h4>
+                                </div>
+                                <div class="modal-body">
+                                    <p id="confirmMessage">Some text in the modal.</p>
+
+                                    <fieldset class="form-horizontal">
+                                        <div class="form-group">
+                                            <label class="control-label col-sm-2"></label>
+                                            <div class="col-sm-10">
+                                                <div class="big-row-item">
+                                                    <div class="form-group">
+                                                        <button type="submit" name="submitButton" value="submitButton" id="confirmOk" class="btn btn-primary btn-sm">${ec.l10n.localize('Delete')}</button>
+                                                        <button type="button" name="cancelButton" id="confirmCancel" class="btn btn-default" data-dismiss="modal">${ec.l10n.localize('Close')}</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </fieldset>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                ]]>
+            </text>
+        </render-mode>
     </widgets>
 </screen>

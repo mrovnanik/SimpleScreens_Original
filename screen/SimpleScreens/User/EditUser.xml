@@ -71,6 +71,7 @@ along with this software (see the LICENSE.md file). If not, see
         <set field="paymentInfoFlat" from="flattenNestedMap(paymentContactInfo)"/>
         <set field="contactInfo" from="paymentContactInfo"/>
 
+        <!-- TODO: limit to locales for tenant -->
         <set field="localeStringList" from="[]"/>
         <iterate list="Locale.getAvailableLocales()" entry="lcl"><script>localeStringList.add([locale:lcl.toString(), name:lcl.getDisplayName(ec.user.locale)])</script></iterate>
         <order-map-list list="localeStringList"><order-by field-name="name"/></order-map-list>
@@ -85,7 +86,7 @@ along with this software (see the LICENSE.md file). If not, see
                             extends="component://SimpleScreens/template/party/PartyForms.xml#ContactInfo"/>
                 </container-dialog>
 
-                <render-mode><text type="html,vuet" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
+                <render-mode><text type="html" location="component://SimpleScreens/template/party/ContactInfo.html.gstring"/></render-mode>
             </panel-left>
             <panel-center>
                 <section name="UserAdminSection"><condition><expression>ec.user.isInGroup(personAndUserAccount?.userId, "HIVE_MIND_ADMIN", null, ec)</expression></condition>
@@ -104,12 +105,13 @@ along with this software (see the LICENSE.md file). If not, see
                     <field name="firstName"><default-field><text-line size="15"/></default-field></field>
                     <field name="middleName"><default-field><text-line size="15"/></default-field></field>
                     <field name="lastName"><default-field><text-line size="15"/></default-field></field>
-                    <field name="emailAddress" from="primaryEmail.emailAddress"><default-field><text-line/></default-field></field>
+                    <field name="emailAddress" entry-name="primaryEmail.emailAddress"><default-field><text-line/></default-field></field>
 
                     <field name="locale"><default-field>
                         <drop-down allow-empty="true" combo-box="true"><list-options list="localeStringList" key="${locale}" text="${name}"/></drop-down>
                     </default-field></field>
                     <field name="timeZone"><default-field>
+                        <!-- TODO: limit time zones to tenant zones -->
                         <drop-down allow-empty="true" combo-box="true"><list-options list="new TreeSet(TimeZone.getAvailableIDs().collect())"/></drop-down>
                     </default-field></field>
                     <field name="disabled"><default-field><drop-down no-current-selected-key="N" current="selected">

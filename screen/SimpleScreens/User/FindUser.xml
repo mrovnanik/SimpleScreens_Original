@@ -22,8 +22,10 @@ along with this software (see the LICENSE.md file). If not, see
     <transition name="findUser"><default-response url="."/></transition>
     <transition name="createUser">
         <actions>
+             <!--<log message="userGroupId selected: ${userGroupIdSelected}" level="info"/>-->
+
             <service-call name="mantle.party.PartyServices.create#Account" in-map="context + [loginAfterCreate:'false']" out-map="context"/>
-            <service-call name="create#moqui.security.UserGroupMember" in-map="[userGroupId:'HIVE_MIND_USERS', userId:context.userId, fromDate:ec.user.nowTimestamp]"/>
+            <service-call name="create#moqui.security.UserGroupMember" in-map="[userGroupId:userGroupIdSelected, userId:context.userId, fromDate:ec.user.nowTimestamp]"/>
         </actions>
         <default-response url="../EditUser"/>
         <error-response url="."/>
@@ -55,6 +57,15 @@ along with this software (see the LICENSE.md file). If not, see
                     <field name="firstName"><default-field><text-line size="15"/></default-field></field>
                     <field name="lastName"><default-field><text-line size="15"/></default-field></field>
                     <field name="emailAddress"><default-field><text-line/></default-field></field>
+                    <field name="userGroupIdSelected">
+                        <default-field>
+                            <drop-down no-current-selected-key="ALL_USERS">
+                                <entity-options key="${userGroupId}" text="[${userGroupId}] ${description}">
+                                    <entity-find entity-name="moqui.security.UserGroup"><order-by field-name="description"/></entity-find>
+                                </entity-options>
+                            </drop-down>
+                        </default-field>
+                    </field>
                     <field name="username"><default-field tooltip="Leave blank to use Email Address"><text-line size="20"/></default-field></field>
                     <field name="newPassword"><default-field title="Password"><password size="15"/></default-field></field>
                     <field name="newPasswordVerify"><default-field title="Password Verify"><password size="15"/></default-field></field>
