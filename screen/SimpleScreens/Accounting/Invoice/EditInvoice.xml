@@ -127,13 +127,13 @@ along with this software (see the LICENSE.md file). If not, see
     <transition name="createContent">
         <actions>
             <iterate list="contentFiles" entry="contentFile">
-                <service-call name="InvoiceContentServices.create#InvoiceContent" in-map="context" out-map="context"/>
+                <service-call name="mantle.account.InvoiceContentServices.create#InvoiceContent" in-map="context" out-map="context"/>
             </iterate>
         </actions>
 
         <default-response url="."/>
     </transition>
-    <transition name="updateContent"><service-call name="InvoiceContentServices.update#InvoiceContent"/>
+    <transition name="updateContent"><service-call name="mantle.account.InvoiceContentServices.update#InvoiceContent"/>
         <default-response url="."/></transition>
     <transition name="downloadContent" read-only="true">
         <parameter name="invoiceContentId"/>
