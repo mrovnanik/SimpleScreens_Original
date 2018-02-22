@@ -21,7 +21,7 @@ along with this software (see the LICENSE.md file). If not, see
     <parameter name="partyId"/>
 
     <!-- A reusable transition to find parties for autocomplete text-line -->
-    <transition name="getPartyList">
+    <transition name="getPartyList" read-only="true">
         <parameter name="term"/>
         <parameter name="roleTypeId"/>
         <actions>
