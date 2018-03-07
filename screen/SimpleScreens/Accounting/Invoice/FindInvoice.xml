@@ -16,8 +16,8 @@ along with this software (see the LICENSE.md file). If not, see
         xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
         default-menu-include="false">
 
-    <macro-template type="vuet" location="template/screen-macro/econScreenMacros.vuet.ftl"/>
-    <macro-template type="html" location="template/screen-macro/econScreenMacros.html.ftl"/>
+    <!--<macro-template type="vuet" location="template/screen-macro/econScreenMacros.vuet.ftl"/>-->
+    <!--<macro-template type="html" location="template/screen-macro/econScreenMacros.html.ftl"/>-->
 
     <parameter name="toPartyId"/>
 
