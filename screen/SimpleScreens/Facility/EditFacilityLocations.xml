@@ -12,7 +12,7 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         default-menu-title="Locations" default-menu-index="2">
 
     <parameter name="facilityId" required="true"/>
@@ -33,7 +33,7 @@ along with this software (see the LICENSE.md file). If not, see
         <container-dialog id="NewLocationDialog" button-text="New Location">
             <form-single name="NewLocationForm" transition="createFacilityLocation">
                 <field name="facilityId"><default-field title="Facility">
-                    <display-entity entity-name="mantle.facility.Facility" text="${facilityName} [${pseudoId}]"/></default-field></field>
+                    <display-entity entity-name="mantle.facility.Facility" text="FacilityNameTemplate"/></default-field></field>
                 <field name="locationSeqId"><default-field title="Location ID" tooltip="Leave empty to set to Area+Aisle+Section+Level+Position">
                     <text-line size="30"/></default-field></field>
                 <field name="locationTypeEnumId"><default-field title="Type">
@@ -52,7 +52,7 @@ along with this software (see the LICENSE.md file). If not, see
 
         <form-list name="LocationsForm" list="locationList" transition="updateFacilityLocation" paginate-always-show="false">
             <field name="facilityId"><header-field><hidden/></header-field><default-field><hidden/></default-field></field>
-            <field name="Inventory"><default-field title=""><link url="findAsset" text="Inventory"
+            <field name="inventory"><default-field title=""><link url="findAsset" text="Inventory"
                     link-type="anchor-button" parameter-map="[facilityId:facilityId, locationSeqId:locationSeqId]"/></default-field></field>
             <field name="locationSeqId">
                 <header-field title="ID" show-order-by="true"><text-find size="6" hide-options="true"/></header-field>

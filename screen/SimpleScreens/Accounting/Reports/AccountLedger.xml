@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This software is in the public domain under CC0 1.0 Universal plus a 
+Grant of Patent License.
+
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software (see the LICENSE.md file). If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
+        default-menu-include="false">
+
+    <parameter name="glAccountId"/>
+    <parameter name="glAccountIdList"/>
+    <parameter name="timePeriodId"/>
+
+    <transition name="editTransaction"><default-response url="../../Transaction/EditTransaction"/></transition>
+
+    <transition name="editInvoice"><default-response url="../../Invoice/EditInvoice"/></transition>
+    <transition name="editPayment"><default-response url="../../Payment/EditPayment"/></transition>
+    <transition name="editGlAccount"><default-response url="../../GlAccount/EditGlAccount"/></transition>
+    <transition name="assetDetail"><default-response url="//${appRoot}/Asset/AssetDetail"/></transition>
+    <transition name="editProduct"><default-response url="//${appRoot}/Catalog/Product/EditProduct"/></transition>
+    <transition name="editParty"><default-response url="//${appRoot}/Party/EditParty"/></transition>
+
+    <transition-include name="getGlAccountListPaginated" location="component://SimpleScreens/template/account/AccountTransitions.xml"/>
+    <transition-include name="getTimePeriodList" location="component://SimpleScreens/template/party/PartyTransitions.xml"/>
+    <transition-include name="searchPartyList" location="component://SimpleScreens/template/party/PartyForms.xml"/>
+    <transition-include name="getProductList" location="component://SimpleScreens/template/product/ProductTransitions.xml"/>
+
+    <actions>
+        <if condition="glAccountId &amp;&amp; !glAccountIdList"><set field="glAccountIdList" from="[glAccountId]"/></if>
+        <if condition="glAccountIdList instanceof String"><then>
+            <set field="glAccountIdList" from="glAccountIdList.contains(',') ? (glAccountIdList.split(',') as List) : [glAccountIdList]"/>
+        </then><else><set field="glAccountIdList" from="glAccountIdList as List"/></else></if>
+        <if condition="timePeriodId &amp;&amp; glAccountIdList">
+            <service-call name="mantle.ledger.LedgerReportServices.get#AccountLedgerInfo" out-map="context"
+                    in-map="[timePeriodId:timePeriodId, glAccountIdList:glAccountIdList, showReverses:showReverses]"/>
+        </if>
+    </actions>
+    <widgets>
+        <container-box><box-header title="${timePeriod?.periodName ?: 'No Period Selected'} ${timePeriod?.fromDate ? '(from ' + timePeriod.fromDate : ''}${timePeriod?.thruDate ? ' thru ' + timePeriod.thruDate + ')': ''}"/><box-body-nopad>
+            <form-list name="AccountLedger" list="entryInfoList" skip-form="true" header-dialog="true"
+                    select-columns="true" saved-finds="true" show-csv-button="true">
+                <field name="glAccountIdList">
+                    <header-field title="GL Account"><drop-down allow-multiple="true">
+                        <dynamic-options transition="getGlAccountListPaginated" server-search="true" min-length="0"
+                                parameter-map="[glAccountId:null, organizationPartyId:null]"/></drop-down></header-field>
+                </field>
+                <field name="organizationPartyId">
+                    <header-field title="Organization"><drop-down>
+                        <entity-options key="${partyId}" text="PartyNameTemplate"><entity-find entity-name="mantle.party.PartyDetailAndRole">
+                            <econdition field-name="roleTypeId" value="OrgInternal"/>
+                            <econdition field-name="disabled" value="N" or-null="true"/>
+                            <order-by field-name="organizationName"/>
+                        </entity-find></entity-options>
+                    </drop-down></header-field>
+                </field>
+                <field name="timePeriodId"><header-field title="Time Period"><drop-down>
+                    <dynamic-options transition="getTimePeriodList" server-search="true" min-length="0"
+                            parameter-map="[timePeriodTypeId:'FiscalYear,FiscalQuarter,FiscalMonth', timePeriodId:null]">
+                        <depends-on field="organizationPartyId" parameter="partyId"/></dynamic-options>
+                </drop-down></header-field></field>
+
+                <field name="acctgTransId"><default-field title="TX ID">
+                    <link url="editTransaction" text="${acctgTransId}" link-type="anchor" condition="acctgTransId"/>
+                    <label text="${accountCode?:''}" style="text-strong" condition="!acctgTransId"/>
+                </default-field></field>
+                <field name="glJournalId"><default-field title="Jrnl">
+                    <display-entity entity-name="mantle.ledger.transaction.GlJournal" text="${glJournalName?.take(3)}"/></default-field></field>
+
+                <field name="transactionDate"><default-field title="Trans Date" container-style="${acctgTransId ? '' : 'text-strong'}">
+                    <display format="yyyy-MM-dd"/></default-field></field>
+
+                <field name="acctgTransTypeEnumId"><default-field title="TX Type">
+                    <display-entity entity-name="moqui.basic.Enumeration"/></default-field></field>
+                <field name="description"><default-field container-style="${acctgTransId ? '' : 'text-strong'}">
+                    <display text="${description ?: txDescription ?: ec.entity.find('moqui.basic.Enumeration').condition('enumId', acctgTransTypeEnumId).one()?.description ?: ''}"/></default-field></field>
+                <field name="otherPartyId"><default-field title="Other Party">
+                    <link url="editParty" link-type="anchor" parameter-map="[partyId:otherPartyId]" text="PartyNameTemplate" condition="otherPartyId"/>
+                </default-field></field>
+
+                <field name="invoiceId"><default-field title="Invoice">
+                    <link url="editInvoice" text="${invoiceId}" link-type="anchor" condition="invoiceId"/></default-field></field>
+                <field name="referenceNumber"><default-field title="Inv Ref"><display/></default-field></field>
+                <field name="invoiceByRef"><default-field title="Invoice/Ref">
+                    <link text="${acctgTransTypeEnumId == 'AttPurchaseInvoice' ? (referenceNumber ?: otherPartyOrderId ?: invoiceId) : invoiceId}"
+                            url="editInvoice" link-type="anchor" condition="invoiceId"/>
+                    <label text="${txVoucherRef}" condition="txVoucherRef"/>
+                </default-field></field>
+                <field name="paymentId"><default-field title="Payment">
+                    <link url="editPayment" text="${paymentId}" link-type="anchor" condition="paymentId"/></default-field></field>
+                <field name="paymentRefNum"><default-field title="Pmt Ref"><display/></default-field></field>
+                <field name="assetId"><default-field title="Asset">
+                    <link url="assetDetail" text="${assetId}" link-type="anchor" condition="assetId"/></default-field></field>
+                <field name="productId"><default-field title="Product">
+                    <link url="editProduct" text="${productId}" link-type="anchor" condition="productId"/></default-field></field>
+
+                <field name="acctgTransEntrySeqId"><default-field title="Entry"><display/></default-field></field>
+                <field name="debit" align="right"><default-field container-style="${acctgTransId ? '' : 'text-strong'}">
+                    <display format="#,##0.00"/></default-field></field>
+                <field name="credit" align="right"><default-field container-style="${acctgTransId ? '' : 'text-strong'}">
+                    <display format="#,##0.00"/></default-field></field>
+                <field name="balance" align="right"><default-field container-style="${acctgTransId ? '' : 'text-strong'}">
+                    <display format="#,##0.00"/></default-field></field>
+
+                <field name="showReverses"><header-field><check><option key="true" text=" "/></check></header-field></field>
+                <field name="find"><header-field title="Find"><submit/></header-field></field>
+
+                <form-list-column><field-ref name="acctgTransId"/></form-list-column>
+                <form-list-column><field-ref name="transactionDate"/></form-list-column>
+                <form-list-column><field-ref name="glJournalId"/></form-list-column>
+                <form-list-column><field-ref name="description"/></form-list-column>
+                <form-list-column><field-ref name="otherPartyId"/></form-list-column>
+                <!-- <form-list-column><field-ref name="invoiceId"/><field-ref name="referenceNumber"/></form-list-column> -->
+                <form-list-column><field-ref name="invoiceByRef"/></form-list-column>
+                <form-list-column><field-ref name="paymentId"/></form-list-column>
+                <form-list-column><field-ref name="paymentRefNum"/></form-list-column>
+                <!-- <form-list-column><field-ref name="assetId"/></form-list-column><form-list-column><field-ref name="productId"/></form-list-column> -->
+                <form-list-column><field-ref name="debit"/></form-list-column>
+                <form-list-column><field-ref name="credit"/></form-list-column>
+                <form-list-column><field-ref name="balance"/></form-list-column>
+            </form-list>
+        </box-body-nopad></container-box>
+    </widgets>
+</screen>

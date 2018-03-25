@@ -12,11 +12,14 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
-        default-menu-title="Orders" default-menu-index="6">
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
+        default-menu-title="Orders" default-menu-index="6" menu-image="/ssstatic/images/Sales.png">
 
-    <subscreens default-item="FindOrder"/>
-    <widgets>
-        <subscreens-active id="order-panel"/>
-    </widgets>
+    <subscreens default-item="FindOrder">
+        <subscreens-item name="OrderIssuedInvoiced" menu-include="false"
+                location="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/OrderIssuedInvoiced.xml"/>
+        <subscreens-item name="SalesAnalysis" menu-include="false"
+                location="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/SalesAnalysis.xml"/>
+    </subscreens>
+    <widgets><subscreens-active id="OrderPanel"/></widgets>
 </screen>

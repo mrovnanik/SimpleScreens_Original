@@ -12,50 +12,50 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<entity-facade-xml type="seed">
-    <moqui.screen.SubscreensItem screenLocation="component://webroot/screen/webroot/apps.xml"
-            subscreenName="my" subscreenLocation="component://SimpleScreens/screen/MyAccount.xml"
-            menuTitle="My Account" menuIndex="90" menuInclude="Y"/>
-    <moqui.screen.SubscreensItem screenLocation="component://webroot/screen/webroot.xml"
-            subscreenName="ssstatic" subscreenLocation="component://SimpleScreens/screen/ssstatic.xml"
-            menuInclude="N"/>
-
+<entity-facade-xml type="seed-initial">
+    <!-- NOTE: subscreen configuration is now in the MoquiConf.xml file instead of DB records
+    <moqui.screen.SubscreensItem screenLocation="component://webroot/screen/webroot/apps.xml" subscreenName="my" menuTitle="My Account"
+            menuIndex="90" menuInclude="Y" subscreenLocation="component://SimpleScreens/screen/MyAccount.xml"/>
+    <moqui.screen.SubscreensItem screenLocation="component://webroot/screen/webroot.xml" subscreenName="ssstatic"
+            menuInclude="N" subscreenLocation="component://SimpleScreens/screen/ssstatic.xml"/>
+    -->
     <!-- Not needed generally, but here commented for convenience:
     <moqui.screen.SubscreensItem screenLocation="component://webroot/screen/webroot/apps.xml"
             subscreenName="SimpleScreens" subscreenLocation="component://SimpleScreens/screen/SimpleScreens.xml"
             menuTitle="Simple Screens" menuIndex="99" menuInclude="N"/>
     -->
 
+    <moqui.basic.Enumeration description="My Account App" enumId="UgtMyAccount" enumTypeId="UserGroupType"/>
+    <userGroups userGroupId="MY_ACCOUNT_USERS" description="My Account Users" groupTypeEnumId="UgtMyAccount"/>
+
     <!-- Artifact group and authz for My Account App -->
     <artifactGroups artifactGroupId="MY_ACCOUNT" description="My Account App (via root screen)">
         <artifacts artifactName="component://SimpleScreens/screen/MyAccount.xml" artifactTypeEnumId="AT_XML_SCREEN" inheritAuthz="Y"/>
-        <authz artifactAuthzId="MY_ACCOUNT_1" userGroupId="ALL_USERS" authzTypeEnumId="AUTHZT_ALLOW" authzActionEnumId="AUTHZA_ALL"/>
+        <authz artifactAuthzId="MY_ACCOUNT_1" userGroupId="MY_ACCOUNT_USERS" authzTypeEnumId="AUTHZT_ALLOW" authzActionEnumId="AUTHZA_ALL"/>
+        <authz artifactAuthzId="MY_ACCOUNT_2" userGroupId="ADMIN" authzTypeEnumId="AUTHZT_ALWAYS" authzActionEnumId="AUTHZA_ALL"/>
     </artifactGroups>
 
     <moqui.screen.ScreenThemeResource screenThemeId="DEFAULT" sequenceNum="120" resourceTypeEnumId="STRT_HEADER_NAVBAR_ITEM">
         <resourceValue><![CDATA[
 <#if ec.user.userId?has_content>
 <div class="btn-group navbar-right">
-    <#assign notificationCount = ec.entity.find("moqui.security.user.NotificationMessageUser").condition("userId", ec.user.userId!).condition("viewedDate", "is-null", "").disableAuthz().count()>
-    <#assign messageCount = ec.entity.find("mantle.party.communication.CommunicationEvent").condition("toPartyId", ec.user.userAccount.partyId!).condition("statusId", "CeReceived").condition("communicationEventTypeId", "in", "Email,Message,Comment").disableAuthz().count()>
-    <#assign eventCount = ec.entity.find("mantle.work.effort.WorkEffortAndParty").condition("partyId", ec.user.userAccount.partyId!).condition("estimatedStartDate", "greater-equals", ec.user.getPeriodRange("week", "")[0]).condition("estimatedStartDate", "less-equals", ec.user.getPeriodRange("week", "")[1]).condition("workEffortTypeEnumId", "WetEvent").conditionDate("", "", ec.user.nowTimestamp).disableAuthz().count()>
-    <#assign taskCount = ec.entity.find("mantle.work.effort.WorkEffortAndParty").condition("partyId", ec.user.userAccount.partyId!).condition("statusId", "not-in", "WeClosed,WeCancelled").condition("workEffortTypeEnumId", "WetTask").conditionDate("", "", ec.user.nowTimestamp).disableAuthz().count()>
+    <#assign noticeCounts = ec.service.sync().name("mantle.party.PartyServices.get#UserNoticeCounts").disableAuthz().call()>
     <#assign webRoot = ec.web.getWebappRootUrl(false, false)>
     <a href="${webRoot!""}/apps/my/User/Notifications" data-toggle="tooltip" data-container="body" data-original-title="Notifications" data-placement="bottom" class="btn btn-default btn-sm navbar-btn">
         <i class="glyphicon glyphicon-info-sign"></i>
-        <span id="navbar_notification_count" class="label label-info">${notificationCount!"0"}</span>
+        <span id="navbar_notification_count" class="label label-info">${noticeCounts.notificationCount!"0"}</span>
     </a>
     <a href="${webRoot!""}/apps/my/User/Messages/FindMessage?statusId=CeReceived&toPartyId=${ec.user.userAccount.partyId!}" data-toggle="tooltip" data-container="body" data-original-title="Messages" data-placement="bottom" class="btn btn-default btn-sm navbar-btn">
         <i class="glyphicon glyphicon-envelope"></i>
-        <span class="label label-warning">${messageCount!"0"}</span>
+        <span class="label label-warning">${noticeCounts.messageCount!"0"}</span>
     </a>
     <a href="${webRoot!""}/apps/my/User/Calendar/MyCalendar" data-toggle="tooltip" data-container="body" data-original-title="Events This Week" data-placement="bottom" class="btn btn-default btn-sm navbar-btn">
         <i class="glyphicon glyphicon-calendar"></i>
-        <span class="label label-primary">${eventCount!"0"}</span>
+        <span class="label label-primary">${noticeCounts.eventCount!"0"}</span>
     </a>
     <a href="${webRoot!""}/apps/my/User/Task/MyTasks" data-toggle="tooltip" data-container="body" data-original-title="Open Tasks" data-placement="bottom" class="btn btn-default btn-sm navbar-btn">
         <i class="glyphicon glyphicon-check"></i>
-        <span class="label label-success">${taskCount!"0"}</span>
+        <span class="label label-success">${noticeCounts.taskCount!"0"}</span>
     </a>
 </div>
 </#if>
@@ -73,4 +73,219 @@ along with this software (see the LICENSE.md file). If not, see
     </moqui.screen.ScreenThemeResource>
     <moqui.screen.ScreenThemeResource screenThemeId="DEFAULT" sequenceNum="130" resourceTypeEnumId="STRT_HEADER_NAVBAR_COMP"
                                       resourceValue="/ssstatic/MyAccountNav.js"/>
+    <!-- When needed use something like this for the Active Organization selector in the nav bar:
+    <moqui.screen.ScreenThemeResource screenThemeId="DEFAULT" sequenceNum="135" resourceTypeEnumId="STRT_HEADER_NAVBAR_COMP"
+                                      resourceValue="/ssstatic/ActiveOrgNav.js"/> -->
+
+    <!-- ====================================================== -->
+    <!-- ========== User/Group Preferences Supported ========== -->
+    <!-- ====================================================== -->
+
+    <moqui.basic.Enumeration enumId="FacilityGeneralDefault" description="Facility General Default ID" enumTypeId="UserPreferenceKey"/>
+    <moqui.basic.Enumeration enumId="OrderSalesStoreDefault" description="Order (Sales) Default Store ID" enumTypeId="UserPreferenceKey"/>
+    <moqui.basic.Enumeration enumId="TelecomNumber.DefaultCountryCode" description="Country Code to use as default in forms for phone numbers" enumTypeId="UserPreferenceKey"/>
+    <moqui.basic.Enumeration enumId="PostalAddress.DefaultCountry" description="Country to use as default in forms for postal addresses" enumTypeId="UserPreferenceKey"/>
+    <moqui.basic.Enumeration enumId="CurrencyDefault" description="Currency Default" enumTypeId="UserPreferenceKey"/>
+    <moqui.security.UserGroupPreference userGroupId="ALL_USERS" preferenceKey="TelecomNumber.DefaultCountryCode" preferenceValue="1"/>
+    <moqui.security.UserGroupPreference userGroupId="ALL_USERS" preferenceKey="PostalAddress.DefaultCountry" preferenceValue="USA"/>
+
+    <!-- ========================================== -->
+    <!-- ========== Screen Documentation ========== -->
+    <!-- ========================================== -->
+    <!-- ('locale' defaults to all if not specified, 'docTitle' defaults to filename from location) -->
+
+    <!-- Accounting - GL -->
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/GlAccount/FindGlAccount.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/GL Account Class Reference.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/GlAccount/GlAccountTree.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/GL Account Class Reference.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/GlAccount/EditGlAccount.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/GL Account Class Reference.md"/>
+
+    <!-- Accounting - Invoice -->
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Invoice/FindInvoice.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/Invoice Status Reference.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Invoice/EditInvoice.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/Invoice Status Reference.md"/>
+
+    <!-- Accounting - Payment -->
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Payment/FindPayment.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/Payment Status Reference.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Payment/EditPayment.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/account/Payment Status Reference.md"/>
+
+    <!-- Order -->
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Order/FindOrder.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/order/Order Roles and Parts.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Order/FindOrder.xml"
+            docIndex="110" docLocation="component://SimpleScreens/document/order/Order Status Reference.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Order/OrderDetail.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/order/Order Roles and Parts.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Order/OrderDetail.xml"
+            docIndex="110" docLocation="component://SimpleScreens/document/order/Order Status Reference.md"/>
+
+    <!-- Shipment -->
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Shipment/FindShipment.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/shipment/Shipment Status Reference.md"/>
+    <moqui.screen.ScreenDocument screenLocation="component://SimpleScreens/screen/SimpleScreens/Shipment/ShipmentDetail.xml"
+            docIndex="100" docLocation="component://SimpleScreens/document/shipment/Shipment Status Reference.md"/>
+
+    <!-- ==================================================== -->
+    <!-- ========== Pre-configured form-list finds ========== -->
+    <!-- ==================================================== -->
+
+    <!-- Accounting/Invoice/FindInvoice -->
+    <moqui.screen.form.FormConfig formConfigId="AI_FI_AR_CUST_STMT"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Invoice/FindInvoice.xml.form_list$InvoiceList">
+        <fields positionSequence="0" positionIndex="0" fieldName="toPartyId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="invoiceId"/>
+        <fields positionSequence="0" positionIndex="2" fieldName="referenceNumber"/>
+        <fields positionSequence="0" positionIndex="3" fieldName="invoiceDate"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="dueDate"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="statusId"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="unpaidTotal"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AI_FI_AR_CUST_STMT" formConfigId="AI_FI_AR_CUST_STMT"
+            description="AR Customer Statement" orderByField="+invoiceDate"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Invoice/FindInvoice.xml.form_list$InvoiceList">
+        <fields fieldName="statusId" fieldOperator="in" fieldValue="InvoiceInProcess,InvoiceFinalized,InvoiceSent"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
+
+    <!-- Accounting/Reports/SalesAnalysis -->
+    <moqui.screen.form.FormConfig formConfigId="AC_REP_SAL_AN_BY_PRD"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/SalesAnalysis.xml.form_list$SalesAnalysis">
+        <fields positionSequence="0" positionIndex="0" fieldName="pseudoId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="productName"/>
+        <fields positionSequence="0" positionIndex="3" fieldName="minUnitAmount"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="maxUnitAmount"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="averageAmount"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="quantity"/>
+        <fields positionSequence="0" positionIndex="7" fieldName="totalSales"/>
+        <fields positionSequence="0" positionIndex="8" fieldName="totalCost"/>
+        <fields positionSequence="0" positionIndex="9" fieldName="marginAmount"/>
+        <fields positionSequence="0" positionIndex="10" fieldName="marginPercent"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AC_REP_SAL_AN_BY_PRD" formConfigId="AC_REP_SAL_AN_BY_PRD"
+            description="By Product Last Month" orderByField="pseudoId"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/SalesAnalysis.xml.form_list$SalesAnalysis">
+        <fields fieldName="pageNoLimit" fieldOperator="equals" fieldValue="true"/>
+        <fields fieldName="issuedDate" fieldPeriod="month" fieldPerOffset="-1"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
+
+    <!-- Accounting/Reports/InvoiceAgingDetail -->
+    <moqui.screen.form.FormConfig formConfigId="AC_REP_INVAGD_RECSUM"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields positionSequence="0" positionIndex="0" fieldName="toPseudoId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="toName"/>
+        <!-- <fields positionSequence="0" positionIndex="2" fieldName="statusId"/> -->
+        <fields positionSequence="0" positionIndex="3" fieldName="count"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="currentDue"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="period1"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="period2"/>
+        <fields positionSequence="0" positionIndex="7" fieldName="period3"/>
+        <fields positionSequence="0" positionIndex="8" fieldName="period4"/>
+        <fields positionSequence="0" positionIndex="9" fieldName="periodRemaining"/>
+        <fields positionSequence="0" positionIndex="10" fieldName="unpaidAmount"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AC_REP_INVAGD_RECSUM" formConfigId="AC_REP_INVAGD_RECSUM"
+            description="Receivable Summary" orderByField="toName,invoiceId"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields fieldName="pageNoLimit" fieldOperator="equals" fieldValue="true"/>
+        <fields fieldName="dateField" fieldOperator="equals" fieldValue="dueDate"/>
+        <fields fieldName="invoiceType" fieldOperator="equals" fieldValue="Receivable"/>
+        <fields fieldName="periodDays" fieldOperator="equals" fieldValue="30"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
+    <moqui.screen.form.FormConfig formConfigId="AC_REP_INVAGD_RECDET"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields positionSequence="0" positionIndex="0" fieldName="toPseudoId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="toName"/>
+        <fields positionSequence="0" positionIndex="2" fieldName="invoiceDate"/>
+        <fields positionSequence="0" positionIndex="3" fieldName="invoiceId"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="currentDue"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="period1"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="period2"/>
+        <fields positionSequence="0" positionIndex="7" fieldName="period3"/>
+        <fields positionSequence="0" positionIndex="8" fieldName="period4"/>
+        <fields positionSequence="0" positionIndex="9" fieldName="periodRemaining"/>
+        <fields positionSequence="0" positionIndex="10" fieldName="unpaidAmount"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AC_REP_INVAGD_RECDET" formConfigId="AC_REP_INVAGD_RECDET"
+            description="Receivable Detail" orderByField="toName,invoiceId"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields fieldName="pageNoLimit" fieldOperator="equals" fieldValue="true"/>
+        <fields fieldName="dateField" fieldOperator="equals" fieldValue="dueDate"/>
+        <fields fieldName="invoiceType" fieldOperator="equals" fieldValue="Receivable"/>
+        <fields fieldName="periodDays" fieldOperator="equals" fieldValue="30"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
+    <moqui.screen.form.FormConfig formConfigId="AC_REP_INVAGD_PAYSUM"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields positionSequence="0" positionIndex="0" fieldName="fromPseudoId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="fromName"/>
+        <!-- <fields positionSequence="0" positionIndex="2" fieldName="statusId"/> -->
+        <fields positionSequence="0" positionIndex="3" fieldName="count"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="currentDue"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="period1"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="period2"/>
+        <fields positionSequence="0" positionIndex="7" fieldName="period3"/>
+        <fields positionSequence="0" positionIndex="8" fieldName="period4"/>
+        <fields positionSequence="0" positionIndex="9" fieldName="periodRemaining"/>
+        <fields positionSequence="0" positionIndex="10" fieldName="unpaidAmount"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AC_REP_INVAGD_PAYSUM" formConfigId="AC_REP_INVAGD_PAYSUM"
+            description="Payable Summary" orderByField="fromName,invoiceId"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields fieldName="pageNoLimit" fieldOperator="equals" fieldValue="true"/>
+        <fields fieldName="dateField" fieldOperator="equals" fieldValue="dueDate"/>
+        <fields fieldName="invoiceType" fieldOperator="equals" fieldValue="Payable"/>
+        <fields fieldName="periodDays" fieldOperator="equals" fieldValue="30"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
+    <moqui.screen.form.FormConfig formConfigId="AC_REP_INVAGD_PAYDET"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields positionSequence="0" positionIndex="0" fieldName="fromPseudoId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="fromName"/>
+        <fields positionSequence="0" positionIndex="2" fieldName="invoiceDate"/>
+        <fields positionSequence="0" positionIndex="3" fieldName="invoiceId"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="currentDue"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="period1"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="period2"/>
+        <fields positionSequence="0" positionIndex="7" fieldName="period3"/>
+        <fields positionSequence="0" positionIndex="8" fieldName="period4"/>
+        <fields positionSequence="0" positionIndex="9" fieldName="periodRemaining"/>
+        <fields positionSequence="0" positionIndex="10" fieldName="unpaidAmount"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AC_REP_INVAGD_PAYDET" formConfigId="AC_REP_INVAGD_PAYDET"
+            description="Payable Detail" orderByField="fromName,invoiceId"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Reports/InvoiceAgingDetail.xml.form_list$InvoiceAgingList">
+        <fields fieldName="pageNoLimit" fieldOperator="equals" fieldValue="true"/>
+        <fields fieldName="dateField" fieldOperator="equals" fieldValue="dueDate"/>
+        <fields fieldName="invoiceType" fieldOperator="equals" fieldValue="Payable"/>
+        <fields fieldName="periodDays" fieldOperator="equals" fieldValue="30"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
+
+    <!-- Accounting/Transaction/FindTransactionEntry -->
+    <moqui.screen.form.FormConfig formConfigId="AT_FTE_AR_CUST_LEDG"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Transaction/FindTransactionEntry.xml.form_list$TransactionEntryList">
+        <fields positionSequence="0" positionIndex="0" fieldName="otherPartyId"/>
+        <fields positionSequence="0" positionIndex="1" fieldName="acctgTransId"/>
+        <fields positionSequence="0" positionIndex="2" fieldName="transactionDate"/>
+        <fields positionSequence="0" positionIndex="3" fieldName="acctgTransTypeEnumId"/>
+        <fields positionSequence="0" positionIndex="4" fieldName="description"/>
+        <fields positionSequence="0" positionIndex="5" fieldName="invoiceId"/>
+        <fields positionSequence="0" positionIndex="6" fieldName="productId"/>
+        <fields positionSequence="0" positionIndex="7" fieldName="glAccountId"/>
+        <fields positionSequence="0" positionIndex="8" fieldName="debit"/>
+        <fields positionSequence="0" positionIndex="9" fieldName="credit"/>
+    </moqui.screen.form.FormConfig>
+    <moqui.screen.form.FormListFind formListFindId="AT_FTE_AR_CUST_LEDG" formConfigId="AT_FTE_AR_CUST_LEDG"
+            description="AR Customer Ledger" orderByField="-transactionDate,-acctgTransId,acctgTransEntrySeqId"
+            formLocation="component://SimpleScreens/screen/SimpleScreens/Accounting/Transaction/FindTransactionEntry.xml.form_list$TransactionEntryList">
+        <fields fieldName="transactionDate" fieldPeriod="year" fieldPerOffset="0"/>
+        <userGroups userGroupId="ALL_USERS"/>
+    </moqui.screen.form.FormListFind>
 </entity-facade-xml>

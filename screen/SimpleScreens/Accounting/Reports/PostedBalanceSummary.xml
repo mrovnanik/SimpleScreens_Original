@@ -12,7 +12,7 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         default-menu-include="false">
 
     <parameter name="organizationPartyId" required="true"/>
@@ -21,9 +21,13 @@ along with this software (see the LICENSE.md file). If not, see
     <parameter name="timePeriodId"/>
 
     <transition name="PostedBalanceSummaryExport.csv"><default-response url="."><parameter name="renderMode" value="csv"/>
-        <parameter name="pageNoLimit" value="true"/><parameter name="lastStandalone" value="true"/></default-response></transition>
+        <parameter name="pageNoLimit" value="true"/><parameter name="lastStandalone" value="true"/>
+        <parameter name="saveFilename" value="PostedBalanceSummaryExport-${organizationPartyId}-${timePeriodId}.csv"/>
+    </default-response></transition>
     <transition name="PostedBalanceSummaryExport.xml"><default-response url="."><parameter name="renderMode" value="xml"/>
-        <parameter name="pageNoLimit" value="true"/><parameter name="lastStandalone" value="true"/></default-response></transition>
+        <parameter name="pageNoLimit" value="true"/><parameter name="lastStandalone" value="true"/>
+        <parameter name="saveFilename" value="PostedBalanceSummaryExport-${organizationPartyId}-${timePeriodId}.xml"/>
+    </default-response></transition>
 
     <actions>
         <service-call name="mantle.ledger.LedgerServices.find#PartyAcctgPreference" out-map="context"
@@ -36,13 +40,16 @@ along with this software (see the LICENSE.md file). If not, see
             <econdition field-name="timePeriodId" ignore-if-empty="true"/>
             <order-by field-name="accountCode"/>
         </entity-find>
+
+        <set field="glAccountCodeMask" from="partyAcctgPreference?.glAccountCodeMask ?: ec.user.getPreference('GlAccountCodeMask')"/>
+        <set field="accountCodeFormatter" from="masker(glAccountCodeMask, '0')"/><!-- will be null if no mask -->
     </actions>
     <widgets>
         <container>
-            <link url="PostedBalanceSummaryExport.csv" text="Get as CSV" target-window="_blank" expand-transition-url="false"/>
-            <link url="PostedBalanceSummaryExport.xml" text="Get as XML" target-window="_blank" expand-transition-url="false"/>
+            <link url="PostedBalanceSummaryExport.csv" text="Get as CSV" expand-transition-url="false"/>
+            <link url="PostedBalanceSummaryExport.xml" text="Get as XML" expand-transition-url="false"/>
         </container>
-        <form-list name="ResultList" skip-form="true" list="resultList">
+        <form-list name="ResultList" skip-form="true" list="resultList" show-csv-button="true">
             <row-actions>
                 <entity-find-one entity-name="moqui.basic.Enumeration" value-field="classEnum">
                     <field-map field-name="enumId" from="glAccountClassEnumId"/></entity-find-one>
@@ -50,11 +57,12 @@ along with this software (see the LICENSE.md file). If not, see
             <field name="periodName"><default-field><display/></default-field></field>
             <field name="fromDate"><default-field><display/></default-field></field>
             <field name="thruDate"><default-field><display/></default-field></field>
-            <field name="accountCode"><default-field title="Acct Code"><display/></default-field></field>
+            <field name="accountCode"><default-field title="Acct Code">
+                <display text="${accountCodeFormatter != null ? accountCodeFormatter.valueToString(accountCode) : accountCode}"/></default-field></field>
             <field name="accountName"><default-field><display text="${accountName} (${classEnum.description})"/></default-field></field>
+            <field name="beginningBalance"><default-field><display currency-unit-field="partyAcctgPreference?.baseCurrencyUomId"/></default-field></field>
             <field name="postedDebits"><default-field><display currency-unit-field="partyAcctgPreference?.baseCurrencyUomId"/></default-field></field>
             <field name="postedCredits"><default-field><display currency-unit-field="partyAcctgPreference?.baseCurrencyUomId"/></default-field></field>
-            <field name="beginningBalance"><default-field><display currency-unit-field="partyAcctgPreference?.baseCurrencyUomId"/></default-field></field>
             <field name="endingBalance"><default-field><display currency-unit-field="partyAcctgPreference?.baseCurrencyUomId"/></default-field></field>
             <field name="isClosed"><default-field><display/></default-field></field>
         </form-list>

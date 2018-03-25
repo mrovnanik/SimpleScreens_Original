@@ -13,19 +13,16 @@ along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         default-menu-include="false" standalone="true">
 
     <parameter name="invoiceId" required="true"/>
 
     <actions>
-        <service-call name="mantle.account.InvoiceServices.get#InvoicePrintInfo"
-                in-map="[invoiceId:invoiceId]" out-map="context"/>
+        <service-call name="mantle.account.InvoiceServices.get#InvoicePrintInfo" in-map="[invoiceId:invoiceId]" out-map="context"/>
     </actions>
     <widgets>
-        <render-mode>
-            <text type="xsl-fo" location="component://SimpleScreens/template/account/Invoice.xsl-fo.ftl"
-                    template="true" encode="false" no-boundary-comment="true"/>
-        </render-mode>
+        <render-mode><text type="xsl-fo" location="component://SimpleScreens/template/account/Invoice.xsl-fo.ftl"
+                template="true" encode="false" no-boundary-comment="true"/></render-mode>
     </widgets>
 </screen>

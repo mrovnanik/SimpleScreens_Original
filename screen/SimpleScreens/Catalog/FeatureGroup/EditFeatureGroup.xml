@@ -12,7 +12,7 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         default-menu-title="Feature Group">
 
     <parameter name="productFeatureGroupId" required="true"/>
@@ -64,7 +64,7 @@ along with this software (see the LICENSE.md file). If not, see
                 </form-single>
 
                 <container-box>
-                    <box-header><label text="Categories" type="h5"/></box-header>
+                    <box-header title="Categories"/>
                     <box-toolbar>
                         <container-dialog id="AddCategoryDialog" button-text="Apply to Category">
                             <form-single name="AddCategoryForm" transition="createProductCategoryFeatGrpAppl">
@@ -111,7 +111,7 @@ along with this software (see the LICENSE.md file). If not, see
             </row-col>
             <row-col lg="6">
                 <container-box>
-                    <box-header><label text="Features" type="h5"/></box-header>
+                    <box-header title="Features"/>
                     <box-toolbar>
                         <container-dialog id="AddFeatureDialog" button-text="Add Feature">
                             <form-single name="AddFeatureForm" transition="createProductFeatureGroupAppl">

@@ -1,5 +1,112 @@
 
-Simple Screens - Reusable Screens, Forms, Sections, etc - Release Notes
+Simple Screens - Reusable Screens, Forms, Reports, Documents, etc
+
+===========================================================================
+Release 2.0.1 - Not Yet Released
+===========================================================================
+
+Simple Screens 2.0.1 is a major new feature and bug fix release. This
+release is based on Moqui Framework version 2.1.1, mantle-udm 2.0.1, and
+mantle-usl 2.0.1.
+
+New Features
+
+- Budgets (under Accounting) initial version is GL account based only
+- Production Runs (under new Manufacturing section) initial focus on
+  BOM and inventory management, scheduling, and equipment/party assignment
+- Party Agreement screens (under a tab on the Party screen) with settlement
+  terms and structured records of other terms, content attachments
+- Equipment related enhancements to Product (equipment model) and
+  Asset (equipment instance) screens for meters, maintenance, registration,
+  and depreciation
+- Invoice Orders and Shipments tabs to view and manage associations by item
+- Gateway config screens for Payment and Shipping gateways
+- Product Store config screens including promotion, category, email, party
+
+Includes additional icons similar to those in previous versions made by
+SimpleIcon from www.flaticon.com which are licensed CC 3.0 BY:
+http://creativecommons.org/licenses/by/3.0/
+
+
+===========================================================================
+Release 2.0.0 - 22 Oct 2017
+===========================================================================
+
+Simple Screens 2.0.0 is a major new feature and bug fix release. This
+release is based on Moqui Framework version 2.1.0, mantle-udm 2.0.0, and
+mantle-usl 2.0.0.
+
+This release is primarily focused on the procure to pay, order to cash,
+and accounting business processes as used on the POP Commerce ERP/Admin
+application. The POPC ERP app is now an OOTB usable application with
+comprehensive functionality for small and medium sized retailers,
+wholesalers, and distributors of physical goods.
+
+Some basic stats to show just how much new there is:
+
+- Screens: 152 (last release 80)
+- Forms: 463 (last release 223)
+
+There are so many new screens and forms, plus significant enhancements to
+previously existing ones, that it is difficult to list them all. The New
+Features list covers many of the main ones but is far from a complete list
+of everything now in place.
+
+New Features
+
+- Significant cleanups throughout
+- Use new widgets from framework including server-search drop-downs instead
+  of autocomplete in many places, some with default options before input
+- Updates to work with new vuet render mode for more dynamic screens,
+  faster loading, and a better overall user experience
+- Expanded Party screens: Find, Edit (with Roles, Classifications,
+  Identification, Settings, Notes, Email and Phone, Postal Address,
+  Payment Methods, Financial Accounts, and Content), Calendar, Messages,
+  Related parties, and Time Entries
+- New Payment Method screens (Edit, Gateway Responses, Checks, Files,
+  Transactions with reconciliation against Payment records)
+- Improved Customer and Supplier screens with new sections
+- Improved Party, Order, and Payment screens for use with payment gateways
+  like the available Authorize.NET integration
+- Improved Party, Order, and Shipment screens for use with shipping
+  gateways for rate quotes and labels (buy, print, cancel, etc)
+- Improvements for Asset Lots in Asset, Shipment (receive and ship) screens
+- Significant Product Content screen improvements with upload as well as
+  online editing for text content
+- New Request management screens
+- New Wiki Space and Page screens based on old ones from HiveMind
+  - For published content management track version history with compare and
+    selection of version to publish
+- New Return management screens and improvements to Order Detail to show
+  return information and easily create returns or add to existing return
+- Accounting
+  - Accounting Dashboard with organized links/buttons and
+    payable/receivable summary
+  - Reports
+    - Improved Balance Sheet and Income Statement
+    - Account Ledger (entry detail) and Balance History (by period) reports
+    - Asset Receipt, Valuation, and On Hand reports
+    - Invoice Aging Summary, Detail, and Reconciliation reports
+    - Sales Order and Invoice Analysis reports
+  - Improved period close with bulk close (all prev/child) and auto net
+    income (profit/loss) closing transactions
+  - Improved Find Transaction and Find Transaction Entry screens showing
+    summary totals based on columns selected and along with saved finds
+    makes them flexible reporting screens
+  - GL Account tree reference
+- Printed Documents
+  - Invoice PDF improvements for product oriented invoices (previously
+    was only service oriented, now supports both)
+  - Receivable (Customer) Statement PDF
+  - Improved Pack Insert PDF (for outgoing shipment)
+  - New By Package shipment PDF for simpler pick/pack processes
+- Notification Emails: Order Placed, Shipment Shipped, infra for others
+- Online Documentation
+  - Using new framework features
+  - GL Account Class Reference
+  - Invoice and Payment Status References
+  - Order Roles and Parts, Status Reference
+  - Shipment Status Reference
 
 ===========================================================================
 Release 1.1.0 - 24 Nov 2016

@@ -23,15 +23,16 @@ along with this software (see the LICENSE.md file). If not, see
 -->
 
 <#assign checkPosition = checkPosition!"top">
-<#assign topHeight = topHeight!"3.5in">
-<#assign middleHeight = middleHeight!"3.5in">
-<#assign bottomHeight = bottomHeight!"4in">
+<#assign topHeight = topHeight!3.5>
+<#assign middleHeight = middleHeight!3.5>
+<#assign bottomHeight = bottomHeight!4>
+
 
 <#assign separatePayToLine = separatePayToLine!true>
 <#assign checkNumber = checkNumber!false>
 <#assign secondarySignature = secondarySignature!false>
 
-<#assign stubLines = true>
+<#assign stubLines = stubLines!false>
 
 <#assign fontSize = "10pt">
 <#assign amountCharacters = 15><#-- enought for up to 999 million: 999,999,999.99 -->
@@ -42,6 +43,8 @@ along with this software (see the LICENSE.md file). If not, see
 <#assign tableFontSize = tableFontSize!"9pt">
 <#assign detailTableFontSize = detailTableFontSize!"8pt">
 
+<#macro encodeText textValue>${(Static["org.moqui.util.StringUtilities"].encodeForXmlAttribute(textValue!"", false))!""}</#macro>
+
 <#macro checkBody paymentInfo>
     <#-- Check number, if populated -->
     <#if checkNumber && paymentInfo.payment.paymentRefNum?has_content>
@@ -51,20 +54,20 @@ along with this software (see the LICENSE.md file). If not, see
     </#if>
 
     <#-- Date -->
-    <fo:block-container absolute-position="absolute" top="0.8in" right="0.6in" width="1in">
+    <fo:block-container absolute-position="absolute" top="0.85in" right="0.6in" width="1in">
         <fo:block text-align="right">${ec.l10n.format(paymentInfo.payment.effectiveDate, dateFormat)}</fo:block>
     </fo:block-container>
 
     <#-- Pay to line -->
     <#if separatePayToLine>
-    <fo:block-container absolute-position="absolute" top="1.3in" left="1.1in">
-        <fo:block text-align="left">${Static["org.moqui.util.StringUtilities"].encodeForXmlAttribute(paymentInfo.toPartyDetail.organizationName!"", false)}${paymentInfo.toPartyDetail.firstName!} ${paymentInfo.toPartyDetail.lastName!}</fo:block>
+    <fo:block-container absolute-position="absolute" top="1.35in" left="1.1in">
+        <fo:block text-align="left"><@encodeText (paymentInfo.toPartyDetail.organizationName)!""/><@encodeText (paymentInfo.toPartyDetail.firstName)!""/> <@encodeText (paymentInfo.toPartyDetail.lastName)!""/></fo:block>
     </fo:block-container>
     </#if>
 
     <#-- Amount - numeric -->
-    <fo:block-container absolute-position="absolute" top="1.3in" right="0.35in" width="1.3in">
-    <#-- 1.2in seems to fit 14 Courier characters at 10pt just right -->
+    <fo:block-container absolute-position="absolute" top="1.35in" right="0.35in" width="1.3in">
+        <#-- 1.2in seems to fit 14 Courier characters at 10pt just right -->
         <#assign amountString = ec.l10n.format(paymentInfo.payment.amount, "#,##0.00")>
         <#assign asterisks = amountCharacters - amountString?length>
         <fo:block text-align="right" font-family="Courier, monospace"><#list 1..asterisks as i>*</#list>${amountString}</fo:block>
@@ -80,21 +83,21 @@ along with this software (see the LICENSE.md file). If not, see
     <fo:block-container absolute-position="absolute" top="2in" left="1.1in" width="4in" height="0.8in">
         <#assign contactInfo = paymentInfo.toBillingContactInfo>
         <#if (contactInfo.postalAddress.toName)?has_content || (contactInfo.postalAddress.attnName)?has_content>
-            <#if (contactInfo.postalAddress.toName)?has_content><fo:block text-align="left">${contactInfo.postalAddress.toName}</fo:block></#if>
-            <#if (contactInfo.postalAddress.attnName)?has_content><fo:block text-align="left">Attn: ${contactInfo.postalAddress.attnName}</fo:block></#if>
+            <#if (contactInfo.postalAddress.toName)?has_content><fo:block text-align="left"><@encodeText contactInfo.postalAddress.toName/></fo:block></#if>
+            <#if (contactInfo.postalAddress.attnName)?has_content><fo:block text-align="left">Attn: <@encodeText contactInfo.postalAddress.attnName/></fo:block></#if>
         <#else>
-            <fo:block text-align="left">${Static["org.moqui.util.StringUtilities"].encodeForXmlAttribute(paymentInfo.toPartyDetail.organizationName!"", false)}${paymentInfo.toPartyDetail.firstName!} ${paymentInfo.toPartyDetail.lastName!}</fo:block>
+            <fo:block text-align="left"><@encodeText (paymentInfo.toPartyDetail.organizationName)!""/><@encodeText (paymentInfo.toPartyDetail.firstName)!""/> <@encodeText (paymentInfo.toPartyDetail.lastName)!""/></fo:block>
         </#if>
-        <#if (contactInfo.postalAddress.address1)?has_content><fo:block text-align="left">${contactInfo.postalAddress.address1}<#if (contactInfo.postalAddress.unitNumber)?has_content> #${contactInfo.postalAddress.unitNumber}</#if></fo:block></#if>
-        <#if (contactInfo.postalAddress.address2)?has_content><fo:block text-align="left">${contactInfo.postalAddress.address2}</fo:block></#if>
-        <#if (contactInfo.postalAddress)?has_content><fo:block text-align="left">${contactInfo.postalAddress.city!}<#if (contactInfo.postalAddressStateGeo.geoCodeAlpha2)?has_content>, ${contactInfo.postalAddressStateGeo.geoCodeAlpha2} </#if>${contactInfo.postalAddress.postalCode!}<#if (contactInfo.postalAddress.postalCodeExt)?has_content>-${contactInfo.postalAddress.postalCodeExt}</#if><#if (contactInfo.postalAddressCountryGeo.geoCodeAlpha3)?has_content> ${contactInfo.postalAddressCountryGeo.geoCodeAlpha3}</#if></fo:block></#if>
-        <#if (contactInfo.telecomNumber)?has_content><fo:block text-align="left"><#if (contactInfo.telecomNumber.countryCode)?has_content>${contactInfo.telecomNumber.countryCode}-</#if><#if (contactInfo.telecomNumber.areaCode)?has_content>${contactInfo.telecomNumber.areaCode}-</#if>${contactInfo.telecomNumber.contactNumber!}</fo:block></#if>
-    <#-- <#if (contactInfo.emailAddress)?has_content><fo:block text-align="left">${contactInfo.emailAddress}</fo:block></#if> -->
+        <#if (contactInfo.postalAddress.address1)?has_content><fo:block text-align="left"><@encodeText contactInfo.postalAddress.address1/><#if (contactInfo.postalAddress.unitNumber)?has_content> #${contactInfo.postalAddress.unitNumber}</#if></fo:block></#if>
+        <#if (contactInfo.postalAddress.address2)?has_content><fo:block text-align="left"><@encodeText contactInfo.postalAddress.address2/></fo:block></#if>
+        <#if (contactInfo.postalAddress)?has_content><fo:block text-align="left"><@encodeText (contactInfo.postalAddress.city!"")/><#if (contactInfo.postalAddressStateGeo.geoCodeAlpha2)?has_content>, ${contactInfo.postalAddressStateGeo.geoCodeAlpha2} </#if>${contactInfo.postalAddress.postalCode!}<#if (contactInfo.postalAddress.postalCodeExt)?has_content>-${contactInfo.postalAddress.postalCodeExt}</#if><#if (contactInfo.postalAddressCountryGeo.geoCodeAlpha3)?has_content> ${contactInfo.postalAddressCountryGeo.geoCodeAlpha3}</#if></fo:block></#if>
+        <#-- <#if (contactInfo.telecomNumber)?has_content><fo:block text-align="left"><#if (contactInfo.telecomNumber.countryCode)?has_content>${contactInfo.telecomNumber.countryCode}-</#if><#if (contactInfo.telecomNumber.areaCode)?has_content>${contactInfo.telecomNumber.areaCode}-</#if>${contactInfo.telecomNumber.contactNumber!}</fo:block></#if> -->
+        <#-- <#if (contactInfo.emailAddress)?has_content><fo:block text-align="left">${contactInfo.emailAddress}</fo:block></#if> -->
     </fo:block-container>
 
     <#-- Memo -->
     <fo:block-container absolute-position="absolute" top="2.75in" left="0.8in" width="4in">
-        <fo:block text-align="left">${paymentInfo.payment.memo!" "}</fo:block>
+        <fo:block text-align="left"><@encodeText (paymentInfo.payment.memo!" ")/></fo:block>
     </fo:block-container>
 
     <#-- Primary Signature image -->
@@ -115,15 +118,18 @@ along with this software (see the LICENSE.md file). If not, see
     </#if>
 </#macro>
 <#macro stubBody paymentInfo>
-<fo:block margin="0.3in" overflow="hidden">
-    <fo:block text-align="left" margin-bottom="0.1in">${Static["org.moqui.util.StringUtilities"].encodeForXmlAttribute(paymentInfo.fromPartyDetail.organizationName!"", false)}${paymentInfo.fromPartyDetail.firstName!} ${paymentInfo.fromPartyDetail.lastName!} - Payment #${paymentInfo.payment.paymentId}<#if paymentInfo.payment.paymentRefNum?has_content> - Check #${paymentInfo.payment.paymentRefNum}</#if><#if paymentInfo.distGroupEnum?has_content> - ${paymentInfo.distGroupEnum.description}</#if></fo:block>
+<fo:block margin="0.3in" padding-top="0.1in" overflow="hidden">
+    <fo:block text-align="left" margin-bottom="0.1in"><@encodeText (paymentInfo.fromPartyDetail.organizationName)!""/><@encodeText (paymentInfo.fromPartyDetail.firstName)!""/> <@encodeText (paymentInfo.fromPartyDetail.lastName)!""/> - Payment #${paymentInfo.payment.paymentId}<#if paymentInfo.payment.paymentRefNum?has_content> - Check #${paymentInfo.payment.paymentRefNum}</#if><#if paymentInfo.distGroupEnum?has_content> - ${paymentInfo.distGroupEnum.description}</#if></fo:block>
+    <#if paymentInfo.payment.memo?has_content>
+        <fo:block text-align="left" margin-bottom="0.1in"><@encodeText paymentInfo.payment.memo/></fo:block>
+    </#if>
 
     <#if paymentInfo.invoiceList?has_content>
         <fo:table table-layout="fixed" width="7.5in">
             <fo:table-header font-size="9pt" font-weight="bold" border-bottom="solid black">
-                <fo:table-cell width="1.3in" padding="${cellPadding}"><fo:block text-align="left">Our Ref #</fo:block></fo:table-cell>
-                <fo:table-cell width="1.3in" padding="${cellPadding}"><fo:block text-align="left">Your Ref #</fo:block></fo:table-cell>
-                <fo:table-cell width="1.7in" padding="${cellPadding}"><fo:block text-align="left">Invoice Date</fo:block></fo:table-cell>
+                <fo:table-cell width="1.0in" padding="${cellPadding}"><fo:block text-align="left">Our Ref #</fo:block></fo:table-cell>
+                <fo:table-cell width="2.0in" padding="${cellPadding}"><fo:block text-align="left">Your Ref #</fo:block></fo:table-cell>
+                <fo:table-cell width="1.3in" padding="${cellPadding}"><fo:block text-align="left">Invoice Date</fo:block></fo:table-cell>
                 <fo:table-cell width="1.6in" padding="${cellPadding}"><fo:block text-align="right">Invoice Amount</fo:block></fo:table-cell>
                 <fo:table-cell width="1.6in" padding="${cellPadding}"><fo:block text-align="right">Amount Paid</fo:block></fo:table-cell>
             </fo:table-header>
@@ -132,7 +138,7 @@ along with this software (see the LICENSE.md file). If not, see
                     <#assign invoiceTotals = ec.service.sync().name("mantle.account.InvoiceServices.get#InvoiceTotal").parameter("invoiceId", invoice.invoiceId).call()>
                     <fo:table-row font-size="${tableFontSize}" border-bottom="thin solid black">
                         <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${invoice.invoiceId}</fo:block></fo:table-cell>
-                        <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${invoice.referenceNumber!""}</fo:block></fo:table-cell>
+                        <fo:table-cell padding="${cellPadding}"><fo:block text-align="left"><@encodeText (invoice.referenceNumber!"")/><#if invoice.otherPartyOrderId?has_content> - PO <@encodeText invoice.otherPartyOrderId/></#if></fo:block></fo:table-cell>
                         <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${ec.l10n.format(invoice.invoiceDate, dateFormat)}</fo:block></fo:table-cell>
                         <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(invoiceTotals.invoiceTotal, invoice.currencyUomId)}</fo:block></fo:table-cell>
                         <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(invoice.amountApplied, invoice.currencyUomId)}</fo:block></fo:table-cell>
@@ -154,9 +160,10 @@ along with this software (see the LICENSE.md file). If not, see
                 </fo:table-header>
                 <fo:table-body>
                     <#list invoiceItemList as invoiceItem>
+                        <#assign itemTypeEnum = invoiceItem.type!>
                         <fo:table-row font-size="${tableFontSize}">
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${invoiceItem.invoiceItemSeqId}</fo:block></fo:table-cell>
-                            <fo:table-cell padding="${cellPadding}"><fo:block text-align="left">${invoiceItem.description!""}</fo:block></fo:table-cell>
+                            <fo:table-cell padding="${cellPadding}"><fo:block text-align="left"><@encodeText (invoiceItem.description)!(itemTypeEnum.description)!""/></fo:block></fo:table-cell>
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="right">${invoiceItem.quantity!"1"}</fo:block></fo:table-cell>
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(invoiceItem.amount, invoice.currencyUomId, 3)}</fo:block></fo:table-cell>
                             <fo:table-cell padding="${cellPadding}"><fo:block text-align="right" font-family="Courier, monospace">${ec.l10n.formatCurrency(((invoiceItem.quantity!1) * (invoiceItem.amount!0)), invoice.currencyUomId, 3)}</fo:block></fo:table-cell>
@@ -166,7 +173,6 @@ along with this software (see the LICENSE.md file). If not, see
             </fo:table>
         </#if>
     </#if>
-
     <#if paymentInfo.financialAccountTrans??>
         <fo:table table-layout="fixed" width="7in">
             <fo:table-header font-size="9pt" font-weight="bold" border-bottom="solid black">
@@ -185,7 +191,6 @@ along with this software (see the LICENSE.md file). If not, see
             </fo:table-body>
         </fo:table>
     </#if>
-
 </fo:block>
 </#macro>
 
@@ -201,19 +206,18 @@ along with this software (see the LICENSE.md file). If not, see
     <#list paymentInfoList as paymentInfo>
         <fo:page-sequence master-reference="letter-portrait">
             <fo:flow flow-name="xsl-region-body">
-
                 <#-- Top Area -->
-                <fo:block-container absolute-position="absolute" top="0" left="0" width="8.5in" height="${topHeight}">
+                <fo:block-container absolute-position="absolute" top="0" left="0" width="8.5in" height="${topHeight}in">
                     <#if checkPosition == "top"><@checkBody paymentInfo/><#else><@stubBody paymentInfo/></#if>
                 </fo:block-container>
 
                 <#-- Middle Area -->
-                <fo:block-container absolute-position="absolute" top="3.5in" left="0" width="8.5in" height="${middleHeight}"<#if stubLines> border="thin solid black"</#if>>
+                <fo:block-container absolute-position="absolute" top="${topHeight}in" left="0" width="8.5in" height="${middleHeight}in" overflow="hidden"<#if stubLines> border="thin solid black"</#if>>
                     <#if checkPosition == "middle"><@checkBody paymentInfo/><#else><@stubBody paymentInfo/></#if>
                 </fo:block-container>
 
                 <#-- Bottom Area -->
-                <fo:block-container absolute-position="absolute" top="7in" left="0" width="8.5in" height="${bottomHeight}">
+                <fo:block-container absolute-position="absolute" top="${topHeight+middleHeight}in" left="0" width="8.5in" height="${bottomHeight}in" overflow="hidden">
                     <#if checkPosition == "bottom"><@checkBody paymentInfo/><#else><@stubBody paymentInfo/></#if>
                 </fo:block-container>
             </fo:flow>

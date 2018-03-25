@@ -13,7 +13,7 @@ along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         default-menu-title="Notifications" default-menu-index="1">
     <parameter name="showViewed" required="false"/>
 
@@ -38,21 +38,24 @@ along with this software (see the LICENSE.md file). If not, see
     </actions>
     <widgets>
         <container-dialog id="TopicUserDialog" button-text="Topic Subscriptions">
-            <form-list name="NotificationTopicList" list="notificationTopicList" transition="topicSubscriptions"
-                    skip-header="true" multi="true">
+            <form-list name="NotificationTopicList" list="notificationTopicList" transition="topicSubscriptions" multi="true">
                 <row-actions>
                     <entity-find-one entity-name="moqui.security.user.NotificationTopicUser" value-field="notTopicUser">
                         <field-map field-name="topic"/><field-map field-name="userId" from="ec.user.userId"/></entity-find-one>
                 </row-actions>
                 <field name="topic"><default-field><hidden/></default-field></field>
                 <field name="description"><default-field><display/></default-field></field>
-                <field name="receiveNotifications" from="notTopicUser?.receiveNotifications ?: receiveNotifications ?: 'Y'"><default-field>
+                <field name="receiveNotifications" from="notTopicUser?.receiveNotifications ?: receiveNotifications ?: 'Y'"><default-field title="Receive">
                     <radio><option key="Y"/><option key="N"/></radio>
                 </default-field></field>
+                <field name="emailNotifications" from="notTopicUser?.emailNotifications ?: 'N'">
+                    <conditional-field condition="emailTemplateId"><radio><option key="Y"/><option key="N"/></radio></conditional-field>
+                    <default-field title="Email"><display text=""/></default-field>
+                </field>
                 <field name="submitButton"><default-field><submit text="Update"/></default-field></field>
             </form-list>
         </container-dialog>
-        <form-list name="NotificationList" list="notificationList" transition="viewed" multi="true">
+        <form-list name="NotificationList" list="notificationList" transition="viewed" multi="true" header-dialog="true">
             <field name="_useRowSubmit"><default-field><hidden default-value="true"/></default-field></field>
             <field name="_rowSubmit"><header-field title="Select"/>
                 <conditional-field condition="viewedDate"><display text=" "/></conditional-field>
@@ -64,7 +67,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <conditional-field condition="linkText"><link url="${linkText}" text="${titleText}" link-type="anchor" style="${typeString ? 'text-' + typeString : ''}"/></conditional-field>
                 <default-field><label text="${titleText}" style="${typeString ? 'text-' + typeString : ''}"/></default-field>
             </field>
-            <field name="notificationMessageId"><default-field title="ID"><display/></default-field></field>
+            <field name="notificationMessageId"><default-field title="ID"><hidden/></default-field></field>
             <field name="topic">
                 <header-field show-order-by="true"><drop-down allow-empty="true">
                     <list-options list="notificationTopicList" key="${topic}" text="${description}"/>

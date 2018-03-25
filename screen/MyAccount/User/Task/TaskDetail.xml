@@ -13,9 +13,15 @@ along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
 <screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd">
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd">
 
     <parameter name="workEffortId" required="true"/>
+
+    <always-actions>
+        <entity-find entity-name="mantle.work.effort.WorkEffortParty" list="checkWepList">
+            <date-filter/><econdition field-name="workEffortId"/><econdition field-name="partyId" from="ec.user.userAccount.partyId"/></entity-find>
+        <if condition="!checkWepList"><return error="true" message="You are not a party to task ${workEffortId}"/></if>
+    </always-actions>
 
     <transition name="timeEntries"><default-response url="../../TimeEntries"/></transition>
 
@@ -25,7 +31,7 @@ along with this software (see the LICENSE.md file). If not, see
     <transition name="createNote"><service-call name="create#mantle.work.effort.WorkEffortNote"/><default-response url="."/></transition>
     <transition name="updateNote"><service-call name="update#mantle.work.effort.WorkEffortNote"/><default-response url="."/></transition>
 
-    <transition-include name="getPartyList" location="component://SimpleScreens/template/party/PartyForms.xml"/>
+    <transition-include name="searchPartyList" location="component://SimpleScreens/template/party/PartyForms.xml"/>
     <transition name="addAssignment"><service-call name="create#mantle.work.effort.WorkEffortParty"/><default-response url="."/></transition>
     <transition name="updateAssignment"><service-call name="update#mantle.work.effort.WorkEffortParty"/><default-response url="."/></transition>
     <!-- <transition name="editParty"><default-response url="."/></transition> -->
@@ -44,11 +50,11 @@ along with this software (see the LICENSE.md file). If not, see
 
         <!-- Party Assignments -->
         <entity-find entity-name="mantle.work.effort.WorkEffortAndPartyDetail" list="weapdList">
-            <date-filter/><econdition field-name="workEffortId"/><order-by field-name="firstName,organizationName"/></entity-find>
+            <date-filter/><econdition field-name="workEffortId"/><order-by field-name="firstName,lastName,organizationName"/></entity-find>
     </actions>
     <widgets>
         <container-row><row-col lg="6">
-            <container-box><box-header><label text="Task ${workEffortId}" type="h5"/></box-header><box-toolbar>
+            <container-box><box-header title="Task ${workEffortId}"/><box-toolbar>
                 <link url="timeEntries" text="Task Time Entries" parameter-map="[workEffortId:workEffortId]"/>
                 <link url="cloneWorkEffort" text="Clone Task" parameter-map="[baseWorkEffortId:workEffortId,
                         clearDates:true, copyAssetAssign:true]"/>

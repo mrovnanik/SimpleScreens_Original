@@ -12,7 +12,7 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd">
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd">
 
     <transition name="getFacilityList">
         <parameter name="term"/>
@@ -20,8 +20,14 @@ along with this software (see the LICENSE.md file). If not, see
         <parameter name="parentFacilityId"/>
         <parameter name="ownerPartyId"/>
         <actions>
+            <entity-find-one entity-name="mantle.facility.Facility" value-field="facility">
+                <field-map field-name="facilityId" from="term"/></entity-find-one>
+            <if condition="facility != null">
+                <script>ec.web.sendJsonResponse([[value:facility.facilityId, label:"${ec.resource.expand('FacilityNameTemplate','',facility)}".toString()]])</script>
+                <return/>
+            </if>
             <entity-find entity-name="mantle.facility.Facility" list="facilityList" limit="20">
-                <econdition field-name="facilityTypeEnumId" ignore-if-empty="true"/>
+                <econdition field-name="facilityTypeEnumId" operator="in" ignore-if-empty="true"/>
                 <econdition field-name="parentFacilityId" ignore-if-empty="true"/>
                 <econdition field-name="ownerPartyId" ignore-if-empty="true"/>
                 <econditions combine="or">
@@ -35,6 +41,31 @@ along with this software (see the LICENSE.md file). If not, see
                 def outList = []
                 for (def facility in facilityList)
                     outList.add([value:facility.facilityId, label:"${ec.resource.expand('FacilityNameTemplate','',facility)}".toString()])
+                ec.web.sendJsonResponse(outList)
+            </script>
+        </actions>
+        <default-response type="none"/>
+    </transition>
+    <transition name="getLocationList">
+        <parameter name="facilityId"/>
+        <actions>
+            <entity-find entity-name="mantle.facility.FacilityLocation" list="locList" limit="20">
+                <econdition field-name="facilityId" ignore-if-empty="true"/>
+                <econditions combine="or">
+                    <econdition field-name="locationSeqId" operator="like" value="%${term}%" ignore-case="true"/>
+                    <econdition field-name="description" operator="like" value="%${term}%" ignore-case="true"/>
+                    <econdition field-name="areaId" operator="like" value="%${term}%" ignore-case="true"/>
+                    <econdition field-name="aisleId" operator="like" value="%${term}%" ignore-case="true"/>
+                    <econdition field-name="sectionId" operator="like" value="%${term}%" ignore-case="true"/>
+                    <econdition field-name="levelId" operator="like" value="%${term}%" ignore-case="true"/>
+                    <econdition field-name="positionId" operator="like" value="%${term}%" ignore-case="true"/>
+                </econditions>
+                <order-by field-name="areaId,aisleId,sectionId,levelId,positionId,description"/>
+            </entity-find>
+            <script>
+                def outList = []
+                for (def facLoc in locList)
+                outList.add([value:facLoc.locationSeqId, label:ec.resource.expand('FacilityLocationNameTemplate','',facLoc?:[:])])
                 ec.web.sendJsonResponse(outList)
             </script>
         </actions>

@@ -13,7 +13,7 @@ along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
 <widget-templates xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd">
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd">
 
     <widget-template name="partyDropDownByRole">
         <drop-down allow-empty="${allowEmpty ?: 'false'}" no-current-selected-key="${noCurrentSelectedKey?:''}" style="${style?:''}">
@@ -21,8 +21,7 @@ along with this software (see the LICENSE.md file). If not, see
                 <entity-find entity-name="mantle.party.PartyDetailAndRole" cache="true">
                     <econdition field-name="roleTypeId" operator="in" from="roleTypeId"/>
                     <econdition field-name="disabled" value="N" or-null="true"/>
-                    <order-by field-name="organizationName"/>
-                    <order-by field-name="firstName"/><order-by field-name="lastName"/>
+                    <order-by field-name="organizationName,firstName,lastName"/>
                 </entity-find>
             </entity-options>
         </drop-down>

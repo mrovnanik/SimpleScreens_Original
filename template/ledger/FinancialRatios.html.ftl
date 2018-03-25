@@ -1,4 +1,4 @@
-<!--
+<#--
 This software is in the public domain under CC0 1.0 Universal plus a Grant of Patent License.
 
 To the extent possible under law, the author(s) have dedicated all
@@ -11,22 +11,23 @@ along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
 
-<!-- See the mantle.ledger.LedgerReportServices.run#BalanceSheet service for data preparation -->
+<#-- See the mantle.ledger.LedgerReportServices.run#BalanceSheet service for data preparation -->
 
 <#assign numFmt = "0.0000">
+<#assign currencyFormat = currencyFormat!"#,##0.00">
 
 <#macro showRatio name ratioMap>
     <tr>
         <td>${ec.l10n.localize(name)}</td><td><i><#nested></i></td>
-        <#if (timePeriodIdList?size > 1)><td class="text-right">${ec.l10n.format(ratioMap['ALL']!0, numFmt)}</td></#if>
-        <#list timePeriodIdList as timePeriodId><td class="text-right">${ec.l10n.format(ratioMap[timePeriodId]!0, numFmt)}</td></#list>
+        <#if (timePeriodIdList?size > 1)><td class="text-right text-mono">${ec.l10n.format(ratioMap['ALL']!0, numFmt)}</td></#if>
+        <#list timePeriodIdList as timePeriodId><td class="text-right text-mono">${ec.l10n.format(ratioMap[timePeriodId]!0, numFmt)}</td></#list>
     </tr>
 </#macro>
 <#macro showOther name valueMap>
     <tr>
         <td>${ec.l10n.localize(name)}</td><td> </td>
-        <#if (timePeriodIdList?size > 1)><td class="text-right">${ec.l10n.formatCurrency(valueMap['ALL']!0, currencyUomId)}</td></#if>
-        <#list timePeriodIdList as timePeriodId><td class="text-right">${ec.l10n.formatCurrency(valueMap[timePeriodId]!0, currencyUomId)}</td></#list>
+        <#if (timePeriodIdList?size > 1)><td class="text-right text-mono">${ec.l10n.format(valueMap['ALL']!0, currencyFormat)}</td></#if>
+        <#list timePeriodIdList as timePeriodId><td class="text-right text-mono">${ec.l10n.format(valueMap[timePeriodId]!0, currencyFormat)}</td></#list>
     </tr>
 </#macro>
 
@@ -37,7 +38,7 @@ along with this software (see the LICENSE.md file). If not, see
             <th>${ec.l10n.localize("Formula")}</th>
             <#if (timePeriodIdList?size > 1)><th class="text-right">All Periods</th></#if>
             <#list timePeriodIdList as timePeriodId>
-                <th class="text-right">${timePeriodIdMap[timePeriodId].periodName} (Closed: ${timePeriodIdMap[timePeriodId].isClosed})</th>
+                <th class="text-right">${timePeriodIdMap[timePeriodId].periodName}</th>
             </#list>
         </tr>
     </thead>

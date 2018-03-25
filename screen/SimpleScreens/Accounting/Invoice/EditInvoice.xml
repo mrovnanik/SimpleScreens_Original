@@ -12,157 +12,549 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd"
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
         default-menu-title="Invoice" default-menu-index="1">
 
     <parameter name="invoiceId" required="true"/>
 
-    <transition name="updateInvoice"><service-call name="mantle.account.InvoiceServices.update#Invoice"/><default-response url="."/></transition>
+    <transition name="updateInvoice"><service-call name="mantle.account.InvoiceServices.update#Invoice"/>
+        <default-response url="."/></transition>
+    <transition name="updateInvoiceClosed"><service-call name="mantle.account.InvoiceServices.update#InvoiceClosed"/>
+        <default-response url="."/></transition>
     <transition name="updateStatus"><service-call name="update#mantle.account.invoice.Invoice"/><default-response url="."/></transition>
 
-    <transition name="editPayment"><default-response url="../../Payment/EditPayment"/></transition>
-    <transition name="recordPayment"><service-call name="mantle.account.PaymentServices.create#InvoicePayment"/><default-response url="."/></transition>
-    <transition name="sendPromisedPayment"><service-call name="mantle.account.PaymentServices.send#PromisedPayment"/><default-response url="."/></transition>
-    <transition name="editTransaction"><default-response url="../../Transaction/EditTransaction"/></transition>
+    <transition name="adjustInvoice"><service-call name="mantle.account.InvoiceServices.adjust#Invoice"/>
+        <default-response url="."/></transition>
+    <transition name="postInvoice"><service-call name="mantle.ledger.InvoiceAutoPostServices.post#Invoice"/>
+        <default-response url="."/></transition>
+    <transition name="repostInvoice"><service-call name="mantle.ledger.InvoiceAutoPostServices.repost#Invoice"/>
+        <default-response url="."/></transition>
 
+    <transition-include name="getProductList" location="component://SimpleScreens/template/product/ProductTransitions.xml"/>
+    <transition-include name="getGlAccountListPaginated" location="component://SimpleScreens/template/account/AccountTransitions.xml"/>
+    <transition-include name="getItemTypeGlAccount" location="component://SimpleScreens/template/account/AccountTransitions.xml"/>
+
+    <transition name="editPayment"><default-response url="../../Payment/EditPayment"/></transition>
+    <transition name="recordPayment"><service-call name="mantle.account.PaymentServices.create#InvoicePayment"/>
+        <default-response url="."/></transition>
+    <transition name="sendPromisedPayment"><service-call name="mantle.account.PaymentServices.send#PromisedPayment"/>
+        <default-response url="."/></transition>
+    <transition name="applyInvoicePayment"><service-call name="mantle.account.PaymentServices.apply#InvoicePayment"/>
+        <default-response url="."/></transition>
+    <transition name="applyInvoiceToInvoice"><service-call name="mantle.account.PaymentServices.apply#InvoiceToInvoice"/>
+        <default-response url="."/></transition>
+    <transition name="unapplyPaymentApplication"><service-call name="mantle.account.PaymentServices.unapply#PaymentApplication"/>
+        <default-response url="."/></transition>
+
+    <transition name="sendInvoiceStoreEmail"><service-call name="mantle.account.InvoiceServices.send#InvoiceStoreEmail"/>
+        <default-response url="."/></transition>
+    <transition name="sendEmailMessage"><service-call name="org.moqui.impl.EmailServices.send#EmailMessage"/>
+        <default-response url="."/></transition>
+
+    <transition name="editTransaction"><default-response url="../../Transaction/EditTransaction"/></transition>
+    <transition name="editTimePeriod"><default-response url="../../TimePeriod/EditTimePeriod"/></transition>
+
+    <transition name="editParty"><default-response url="//${appRoot}/Party/EditParty"/></transition>
+    <transition name="orderDetail"><default-response url="//${appRoot}/Order/OrderDetail"/></transition>
+    <transition name="shipmentDetail"><default-response url="//${appRoot}/Shipment/ShipmentDetail"/></transition>
+
+    <transition name="createContent"><service-call name="mantle.account.InvoiceServices.create#InvoiceContent"/>
+        <default-response url="."/></transition>
+    <transition name="updateContent"><service-call name="mantle.account.InvoiceServices.update#InvoiceContent"/>
+        <default-response url="."/></transition>
+    <transition name="downloadContent" read-only="true"><parameter name="invoiceContentId"/>
+        <actions><entity-find-one entity-name="mantle.account.invoice.InvoiceContent" value-field="invoiceContent"/>
+            <script>ec.web.sendResourceResponse(invoiceContent.contentLocation)</script></actions>
+        <default-response type="none"/>
+    </transition>
+
+    <transition name="EmailMessage" read-only="true"><parameter name="emailMessageId"/><actions>
+        <entity-find-one entity-name="moqui.basic.email.EmailMessage" value-field="emailMessage"/>
+        <script>ec.web.sendTextResponse(emailMessage?.body, "text/html", null)</script>
+    </actions><default-response type="none"/></transition>
     <transition name="Invoice.pdf">
         <default-response url="${ec.web.getWebappRootUrl(false, null)}/fop/apps/${appRoot}/Accounting/Invoice/PrintInvoice" url-type="plain">
-            <parameter name="renderMode" value="xsl-fo"/><parameter name="pageNoLimit" value="true"/>
-            <parameter name="invoiceId"/>
-            <parameter name="filename" value="Invoice-${invoiceId}.pdf"/>
-        </default-response>
+            <parameter name="invoiceId"/><parameter name="original"/><parameter name="filename" value="Invoice${original == 'true' ? 'Original' : 'Current'}-${invoiceId}.pdf"/></default-response>
     </transition>
 
     <actions>
         <service-call name="mantle.account.InvoiceServices.get#InvoiceDisplayInfo" in-map="[invoiceId:invoiceId]" out-map="context"/>
+        <if condition="invoice == null"><return error="true" message="Invoice ${invoiceId} not found"/></if>
         <!-- set statusId for StatusChangeSection -->
         <set field="statusId" from="invoice?.statusId"/>
+
+        <entity-find entity-name="mantle.party.PartyRole" list="fromOrgInternalList">
+            <econdition field-name="partyId" from="invoice.fromPartyId"/><econdition field-name="roleTypeId" value="OrgInternal"/></entity-find>
+        <set field="isFromPartyOrgInternal" from="fromOrgInternalList as boolean"/>
+        <set field="organizationPartyId" from="isFromPartyOrgInternal ? invoice.fromPartyId : invoice.toPartyId"/>
     </actions>
     <widgets>
-        <container-row>
-            <row-col lg="6">
-                <container>
-                    <link url="Invoice.pdf" text="Invoice PDF" link-type="anchor-button"><parameter name="invoiceId"/></link>
-
-                    <section-iterate name="AcctgTransLinks" list="acctgTransIdSet" entry="acctgTransId"><widgets>
-                        <link url="editTransaction" text="TX #${acctgTransId}" link-type="anchor-button"/>
-                    </widgets></section-iterate>
-                </container>
-
-                <form-single name="EditInvoice" transition="updateInvoice" map="invoice">
-                    <field name="invoiceId"><default-field><display/></default-field></field>
-                    <field name="invoiceTypeEnumId"><default-field title="Type">
-                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                            <set field="enumTypeId" value="InvoiceType"/></widget-template-include>
-                    </default-field></field>
-                    <field name="fromPartyId"><default-field title="From">
-                        <display-entity entity-name="mantle.party.PartyDetail" also-hidden="false" key-field-name="partyId"
-                                text="${organizationName?:''} ${firstName?:''} ${lastName?:''} [${pseudoId}]"/>
-                    </default-field></field>
-                    <field name="toPartyId"><default-field title="To">
-                        <display-entity entity-name="mantle.party.PartyDetail" also-hidden="false" key-field-name="partyId"
-                                text="${organizationName?:''} ${firstName?:''} ${lastName?:''} [${pseudoId}]"/>
-                    </default-field></field>
-                    <field name="invoiceTypeEnumId">
-                        <conditional-field title="Type" condition="invoiceEditable">
-                            <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                                <set field="enumTypeId" value="InvoiceType"/></widget-template-include>
-                        </conditional-field>
-                        <default-field title="Type">
-                            <display-entity entity-name="moqui.basic.Enumeration"/>
-                        </default-field>
-                    </field>
-                    <field name="referenceNumber"><default-field tooltip="Other party Invoice ID or other reference number">
-                        <text-line size="20"/></default-field></field>
-                    <field name="dupWarning">
-                        <conditional-field title="" condition="dupInvoiceList">
-                            <label text="Found invoice(s) with same Reference Number: ${dupInvoiceList.invoiceId}" style="text-danger"/>
-                        </conditional-field>
-                        <default-field><ignored/></default-field>
-                    </field>
-                    <field name="invoiceDate"><default-field><display also-hidden="false"/></default-field></field>
-                    <field name="invoiceTotal"><default-field><display currency-unit-field="invoice.currencyUomId"/></default-field></field>
-                    <field name="dueDate"><default-field><date-time/></default-field></field>
-                    <field name="settlementTermId"><default-field title="Settlement Term">
-                        <drop-down allow-empty="true">
-                            <entity-options key="${settlementTermId}" text="${description}">
-                                <entity-find entity-name="mantle.account.invoice.SettlementTerm">
-                                    <order-by field-name="description"/>
-                                </entity-find>
-                            </entity-options>
-                        </drop-down>
-                    </default-field></field>
-                    <field name="invoiceMessage"><default-field><text-area cols="60" rows="4"/></default-field></field>
-
-                    <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
-                </form-single>
-            </row-col>
-            <row-col lg="6">
-                <section-include name="StatusChangeSection" location="component://SimpleScreens/template/basic/StatusWidgets.xml"/>
-                <section-include name="StatusHistorySection" location="component://SimpleScreens/template/basic/StatusWidgets.xml"/>
-
-                <container-box>
-                    <box-header><label text="Payment Applications" type="h5"/></box-header>
-                    <box-body>
-                        <label text="Applied Payments ${ec.l10n.formatCurrency(appliedPaymentsTotal, invoice.currencyUomId)}, Unpaid ${ec.l10n.formatCurrency(unpaidTotal, invoice.currencyUomId)}" type="strong"/>
-                    </box-body>
-                    <box-body-nopad>
-                        <form-list name="PaymentApplicationList" list="paymentApplicationList">
-                            <field name="paymentId"><default-field title="Payment">
-                                <link url="editPayment" text="#${paymentId?:''}" link-type="anchor"/>
+        <container-row><row-col lg="6">
+            <container>
+                <section name="AdjustSection" condition="statusId in ['InvoiceFinalized', 'InvoiceSent', 'InvoiceApproved']"><widgets>
+                    <container-dialog id="AdjustDialog" button-text="Adjust Invoice">
+                        <form-single name="AdjustInvoice" transition="adjustInvoice">
+                            <field name="invoiceId"><default-field><hidden/></default-field></field>
+                            <field name="itemTypeEnumId"><default-field title="Item Type">
+                                <drop-down><entity-options key="${enumId}" text="${description}">
+                                    <entity-find entity-name="moqui.basic.EnumAndGroup">
+                                        <econdition field-name="enumGroupEnumId" value="EngItemsAdjust"/>
+                                        <order-by field-name="description"/></entity-find>
+                                </entity-options></drop-down>
                             </default-field></field>
-                            <field name="amountApplied"><default-field title="Amount"><display currency-unit-field="invoice.currencyUomId"/></default-field></field>
-                            <field name="appliedDate"><default-field title="Date"><display/></default-field></field>
-                        </form-list>
-                    </box-body-nopad>
-                </container-box>
+                            <field name="itemDate" from="invoice.invoiceDate"><default-field title="Adjustment Item Date"><date-time/></default-field></field>
+                            <field name="description"><default-field><text-line size="40"/></default-field></field>
+                            <field name="amount"><default-field tooltip="May be positive or negative to add to or subtract from invoice total">
+                                <text-line size="10"/></default-field></field>
+                            <field name="parentInvoiceItemSeqId"><default-field title="Adjust Item">
+                                <drop-down allow-empty="true"><entity-options key="${invoiceItemSeqId}"
+                                        text="${invoiceItemSeqId} ${itemTypeDescription?:''} ${description?:''}">
+                                    <entity-find entity-name="mantle.account.invoice.InvoiceItemAndType">
+                                        <econdition field-name="invoiceId"/></entity-find>
+                                </entity-options></drop-down>
+                            </default-field></field>
+                            <field name="productId"><default-field title="Product"><drop-down allow-empty="true">
+                                <dynamic-options transition="getProductList" server-search="true" min-length="0"/>
+                            </drop-down></default-field></field>
 
-                <section name="RecordPaymentSection" condition="canRecordPayments"><widgets>
-                    <container-box>
-                        <box-header><label text="Promised Order Payments" type="h5"/></box-header>
-                        <box-toolbar>
-                            <container-dialog id="RecordPaymentContainer" button-text="New Payment">
-                                <form-single name="RecordPaymentForm" transition="recordPayment">
-                                    <field name="invoiceId"><default-field><display also-hidden="true"/></default-field></field>
-                                    <field name="statusId" from="paymentStatusId"><default-field title="Status">
-                                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#statusDropDown">
-                                            <set field="statusTypeId" value="Payment"/>
-                                            <set field="noCurrentSelectedKey" value="PmntDelivered"/></widget-template-include>
-                                    </default-field></field>
-                                    <field name="amountUomId" from="invoice.currencyUomId"><default-field title="Currency">
-                                        <display-entity entity-name="moqui.basic.Uom" key-field-name="uomId" text="${description}" also-hidden="true"/>
-                                    </default-field></field>
-                                    <field name="amount"><default-field>
-                                        <text-line size="10" default-value="${ec.l10n.format(invoiceTotal, '#0.00')}"/>
-                                    </default-field></field>
-                                    <field name="paymentInstrumentEnumId"><default-field title="Payment Instrument">
-                                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
-                                            <set field="enumTypeId" value="PaymentInstrument"/>
-                                            <set field="noCurrentSelectedKey" value="PiCompanyCheck"/></widget-template-include>
-                                    </default-field></field>
-                                    <field name="effectiveDate" from="ec.user.nowTimestamp"><default-field><date-time/></default-field></field>
-                                    <field name="paymentRefNum"><default-field title="Reference Number"><text-line size="10"/></default-field></field>
-                                    <field name="comments"><default-field><text-area cols="60" rows="4"/></default-field></field>
-                                    <field name="submitButton"><default-field title="Record Payment"><submit/></default-field></field>
-                                </form-single>
-                            </container-dialog>
-                        </box-toolbar>
-                        <box-body>
-                            <form-list name="OrderPromisedPaymentList" list="orderPromisedPaymentList" transition="sendPromisedPayment">
-                                <field name="invoiceId"><default-field><hidden/></default-field></field>
-                                <field name="orderId"><default-field><link url="orderDetail" text="#${orderId?:''}" link-type="anchor"/></default-field></field>
-                                <field name="paymentId"><default-field><display text=""/><link url="editPayment" text="#${paymentId?:''}" link-type="anchor"/></default-field></field>
-                                <field name="amount"><default-field title="Amount"><text-line size="8" format="#.00"/></default-field></field>
-                                <field name="paymentRefNum"><default-field title="Ref Num"><text-line size="8"/></default-field></field>
-                                <field name="submitButton"><default-field title="Send &amp; Apply"><submit/></default-field></field>
-                            </form-list>
-                        </box-body>
-                    </container-box>
+                            <field name="typeGlAccount"><default-field title="Default GL Account">
+                                <display dynamic-transition="getItemTypeGlAccount" also-hidden="false" depends-optional="true"
+                                        parameter-map="[organizationPartyId:organizationPartyId, direction:(isFromPartyOrgInternal ? 'O' : 'I')]">
+                                    <depends-on field="itemTypeEnumId"/><depends-on field="productId"/></display>
+                            </default-field></field>
+                            <field name="overrideGlAccountId"><default-field title="Override GL Account"><drop-down allow-empty="true">
+                                <dynamic-options transition="getGlAccountListPaginated" server-search="true" min-length="0"/></drop-down></default-field></field>
+
+                            <field name="submitButton"><default-field title="Add Adjustment Item"><submit/></default-field></field>
+                        </form-single>
+                    </container-dialog>
                 </widgets></section>
 
-                <!-- TODO: section for InvoiceContent -->
-            </row-col>
-        </container-row>
+                <link url="Invoice.pdf" text="Current PDF" link-type="anchor-button"><parameter name="invoiceId"/></link>
+                <link url="Invoice.pdf" text="Original PDF" link-type="anchor-button">
+                    <parameter name="invoiceId"/><parameter name="original" value="true"/></link>
+
+                <section-iterate name="OrderLinks" list="orderIdSet" entry="orderId"><widgets>
+                    <link url="orderDetail" text="Order ${orderId}" link-type="anchor-button"/>
+                </widgets></section-iterate>
+                <section-iterate name="ShipmentLinks" list="shipmentIdSet" entry="shipmentId"><widgets>
+                    <link url="shipmentDetail" text="Shipment ${shipmentId}" link-type="anchor-button"/>
+                </widgets></section-iterate>
+                <!-- replaced by tx list below:
+                <section-iterate name="AcctgTransLinks" list="acctgTransIdSet" entry="acctgTransId"><widgets>
+                    <link url="editTransaction" text="TX ${acctgTransId}" link-type="anchor-button"/>
+                </widgets></section-iterate>
+                -->
+
+                <link url="updateStatus" text="Uncancel" parameter-map="[invoiceId:invoiceId, statusId:'InvoiceInProcess']"
+                        condition="statusId == 'InvoiceCancelled' &amp;&amp; isFromPartyOrgInternal" confirmation="Go back to In Process status?"/>
+                <link url="updateStatus" text="Uncancel" parameter-map="[invoiceId:invoiceId, statusId:'InvoiceReceived']"
+                        condition="statusId == 'InvoiceCancelled' &amp;&amp; !isFromPartyOrgInternal" confirmation="Go back to Received status?"/>
+
+                <container-dialog id="AuditLogDialog" button-text="Audit Log" width="960">
+                    <form-list name="AuditLogList" list="auditLogList" skip-form="true">
+                        <entity-find entity-name="moqui.entity.EntityAuditLog" list="auditLogList">
+                            <econdition field-name="changedEntityName" operator="in"
+                                    from="['mantle.account.invoice.Invoice', 'mantle.account.invoice.InvoiceItem']"/>
+                            <econdition field-name="changedFieldName" operator="not-equals" value="statusId"/>
+                            <econdition field-name="pkPrimaryValue" from="invoiceId"/>
+                            <select-field field-name="changedEntityName"/>
+                            <order-by field-name="-changedDate,pkSecondaryValue"/>
+                        </entity-find>
+
+                        <field name="changedDate"><default-field title="Date"><display/></default-field></field>
+                        <field name="changedByUserId"><default-field title="User">
+                            <display-entity text="UsernameTemplate" entity-name="mantle.party.PersonWithUserAccount"/></default-field></field>
+                        <field name="pkSecondaryValue"><default-field title="Item"><display/></default-field></field>
+                        <field name="changedFieldName"><default-field title="Field">
+                            <display text="${org.moqui.util.StringUtilities.camelCaseToPretty(changedFieldName)}"/></default-field></field>
+                        <field name="oldValueText"><default-field title="From">
+                            <display text="${ec.entity.formatFieldString(changedEntityName, changedFieldName, oldValueText)}"/></default-field></field>
+                        <field name="newValueText"><default-field title="To">
+                            <display text="${ec.entity.formatFieldString(changedEntityName, changedFieldName, newValueText)}"/></default-field></field>
+                    </form-list>
+                </container-dialog>
+            </container>
+
+            <form-single name="EditInvoice" transition="${invoiceEditable ? 'updateInvoice' : 'updateInvoiceClosed'}" map="invoice">
+                <field name="invoiceId"><default-field><display/></default-field></field>
+                <field name="fromPartyId"><default-field title="From">
+                    <link url="editParty" entity-name="mantle.party.PartyDetail" text="PartyNameTemplate" link-type="anchor"
+                            parameter-map="[partyId:fromPartyId]"/>
+                </default-field></field>
+                <field name="toPartyId"><default-field title="To">
+                    <link url="editParty" entity-name="mantle.party.PartyDetail" text="PartyNameTemplate" link-type="anchor"
+                            parameter-map="[partyId:toPartyId]"/>
+                </default-field></field>
+                <field name="invoiceTypeEnumId">
+                    <conditional-field title="Type" condition="invoiceEditable">
+                        <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
+                            <set field="enumTypeId" value="InvoiceType"/></widget-template-include>
+                    </conditional-field>
+                    <default-field title="Type">
+                        <display-entity entity-name="moqui.basic.Enumeration"/>
+                    </default-field>
+                </field>
+                <field name="timePeriodId">
+                    <conditional-field condition="invoice.timePeriodId" title="Time Period">
+                        <link url="editTimePeriod" text="TimePeriodNameTemplate" link-type="anchor"
+                                entity-name="mantle.party.time.TimePeriod" parameter-map="[timePeriodId:invoice.timePeriodId]"/>
+                    </conditional-field>
+                    <default-field><ignored/></default-field>
+                </field>
+                <field name="referenceNumber"><default-field title="Their Invoice" tooltip="Other party invoice or other reference number">
+                    <text-line size="40"/></default-field></field>
+                <field name="otherPartyOrderId"><default-field title="Their Order" tooltip="Other party purchase or sales order ID">
+                    <text-line size="40"/></default-field></field>
+                <field name="dupWarning">
+                    <conditional-field title="" condition="dupInvoiceList">
+                        <label text="Found invoice(s) with same Reference Number: ${dupInvoiceList.invoiceId}" style="text-danger"/>
+                    </conditional-field>
+                    <default-field><ignored/></default-field>
+                </field>
+                <field name="invoiceDate">
+                    <conditional-field condition="invoiceEditable"><date-time/></conditional-field>
+                    <default-field title="Date"><display also-hidden="false"/></default-field>
+                </field>
+                <field name="invoiceTotal"><default-field title="Total"><display currency-unit-field="invoice.currencyUomId"/></default-field></field>
+                <field name="dueDate"><default-field><date-time type="date"/></default-field></field>
+                <field name="settlementTermId"><default-field title="Settlement Term">
+                    <drop-down allow-empty="true">
+                        <entity-options key="${settlementTermId}" text="${description}">
+                            <entity-find entity-name="mantle.account.invoice.SettlementTerm">
+                                <order-by field-name="description"/>
+                            </entity-find>
+                        </entity-options>
+                    </drop-down>
+                </default-field></field>
+                <field name="description"><default-field><text-line size="60"/></default-field></field>
+                <field name="invoiceMessage"><default-field><text-area cols="60" rows="3"/></default-field></field>
+
+                <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
+
+                <field-layout>
+                    <field-row><field-ref name="invoiceId"/><field-ref name="invoiceTypeEnumId"/></field-row>
+                    <field-row><field-ref name="invoiceDate"/><field-ref name="invoiceTotal"/></field-row>
+                    <fields-not-referenced/>
+                </field-layout>
+            </form-single>
+
+            <section name="ContentSection"><actions>
+                <entity-find entity-name="mantle.account.invoice.InvoiceContent" list="contentList">
+                    <econdition field-name="invoiceId"/><order-by field-name="-contentDate"/></entity-find>
+            </actions><widgets>
+                <container-box><box-header title="Content"/><box-toolbar>
+                    <container-dialog id="NewContentDialog" button-text="Add Content">
+                        <form-single name="NewContentForm" transition="createContent">
+                            <field name="invoiceId"><default-field><hidden/></default-field></field>
+                            <field name="contentTypeEnumId"><default-field title="Content Type">
+                                <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
+                                    <set field="enumTypeId" value="InvoiceContentType"/><set field="allowEmpty" value="true"/></widget-template-include>
+                            </default-field></field>
+                            <field name="contentFile"><default-field><file/></default-field></field>
+                            <field name="description"><default-field><text-line size="60"/></default-field></field>
+                            <field name="submitButton"><default-field title="Add"><submit/></default-field></field>
+                        </form-single>
+                    </container-dialog>
+                </box-toolbar><box-body>
+                    <section-iterate name="ContentIterateSection" list="contentList" entry="content"><actions>
+                        <entity-find-one entity-name="mantle.party.PersonWithUserAccount" value-field="paua">
+                            <field-map field-name="userId" from="content.userId"/></entity-find-one>
+                        <entity-find-one entity-name="moqui.basic.Enumeration" value-field="contentTypeEnum">
+                            <field-map field-name="enumId" from="content.contentTypeEnumId"/></entity-find-one>
+                    </actions><widgets><container>
+                        <container><label text="${contentTypeEnum?.description?:'No Type'}" type="strong"/></container>
+                        <link url="downloadContent" condition="content.contentLocation"
+                                parameter-map="[invoiceContentId:content.invoiceContentId]"
+                                text="Download ${content.contentLocation.substring(content.contentLocation.lastIndexOf('/')+1)}"/>
+                        <container-dialog id="UpdateContentContainer" button-text="Edit Content">
+                            <form-single name="UpdateContentForm" transition="updateContent" map="content">
+                                <field name="invoiceContentId"><default-field><hidden/></default-field></field>
+                                <field name="invoiceId"><default-field><hidden/></default-field></field>
+                                <field name="contentTypeEnumId"><default-field title="Content Type">
+                                    <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
+                                        <set field="enumTypeId" value="InvoiceContentType"/><set field="allowEmpty" value="true"/></widget-template-include>
+                                </default-field></field>
+                                <field name="contentFile"><default-field><file/></default-field></field>
+                                <field name="description"><default-field><text-line size="60"/></default-field></field>
+                                <field name="submitButton"><default-field title="Update"><submit/></default-field></field>
+                            </form-single>
+                        </container-dialog>
+                        <container><label text="By ${ec.resource.expand('UsernameTemplate','',paua+[userId:content.userId])} at ${ec.l10n.format(content.contentDate, 'yyyy-MM-dd HH:mm')}"
+                                condition="paua"/></container>
+                        <label text="${content.description ?: 'No Description'}" type="p"/>
+                    </container></widgets></section-iterate>
+                </box-body></container-box>
+            </widgets></section>
+
+            <section name="EmailMessageSection"><widgets>
+                <container-box><box-header title="Email Messages"/><box-toolbar>
+                    <section name="SendFinalizedEmailSection" condition="invoice.statusId in ['InvoiceFinalized', 'InvoiceSent', 'InvoiceAcked', 'InvoicePmtRecvd']"><actions>
+                        <if condition="invoice.toPartyId">
+                            <service-call name="mantle.party.ContactServices.get#PartyContactInfo" out-map="emailInfo"
+                                    in-map="[partyId:invoice.toPartyId, emailContactMechPurposeId:'EmailBilling', defaultToPrimaryPurpose:true]"/>
+                            <set field="toAddresses" from="emailInfo.emailAddress"/>
+                        </if>
+                    </actions><widgets>
+                        <container-dialog id="SendFinalizedEmailDialog" button-text="Send Email">
+                            <form-single name="SendFinalizedEmailForm" transition="sendInvoiceStoreEmail">
+                                <field name="invoiceId"><default-field><hidden/></default-field></field>
+                                <field name="emailTypeEnumId" from="'PsetInvoiceFinalized'"><default-field><hidden/></default-field></field>
+                                <field name="toAddresses"><default-field title="To Address"><text-line size="40"/></default-field></field>
+                                <field name="submitButton"><default-field title="Send Email"><submit/></default-field></field>
+                            </form-single>
+                        </container-dialog>
+                    </widgets></section>
+                </box-toolbar><box-body>
+                    <form-list name="EmailMessageList" list="emailMessageList" skip-form="true">
+                        <entity-find entity-name="mantle.account.invoice.InvoiceEmailMessageDetail" list="emailMessageList">
+                            <econdition field-name="invoiceId"/><order-by field-name="sentDate,emailMessageId"/></entity-find>
+                        <field name="emailMessageId"><default-field title="ID">
+                            <link url="EmailMessage" text="${emailMessageId}" link-type="anchor" target-window="_blank"/>
+                        </default-field></field>
+                        <field name="sentDate"><default-field><display/></default-field></field>
+                        <field name="toAddresses"><default-field><display/></default-field></field>
+                        <field name="statusId"><default-field title="Status">
+                            <display-entity entity-name="moqui.basic.StatusItem"/></default-field></field>
+                        <field name="receivedDate"><default-field><display/></default-field></field>
+                        <field name="emailTypeEnumId"><default-field title="Email Type">
+                            <display-entity entity-name="moqui.basic.Enumeration"/></default-field></field>
+                        <!-- commented for now as relies on attachment and that isn't saved to be sent again:
+                        <field name="sendLink"><default-field title=""><link url="sendEmailMessage" text="Send"
+                                parameter-map="[emailMessageId:emailMessageId]" condition="!(statusId in ['ES_DRAFT', 'ES_CANCELLED'])"
+                                confirmation="Send this email message?"/>
+                        </default-field></field>
+                        -->
+                    </form-list>
+                </box-body></container-box>
+            </widgets></section>
+        </row-col><row-col lg="6">
+            <section-include name="StatusChangeSection" location="component://SimpleScreens/template/basic/StatusWidgets.xml"/>
+            <section-include name="StatusHistorySection" location="component://SimpleScreens/template/basic/StatusWidgets.xml"/>
+
+            <container-box><box-header title="Payment Applications"/><box-toolbar>
+                <container-dialog id="RecordPaymentContainer" button-text="New Payment for Invoice" condition="unpaidTotal">
+                    <form-single name="RecordPaymentForm" transition="recordPayment">
+                        <field name="invoiceId"><default-field><display/></default-field></field>
+                        <field name="statusId" from="paymentStatusId"><default-field title="Status">
+                            <drop-down no-current-selected-key="PmntPromised">
+                                <option key="PmntProposed" text="Proposed"/>
+                                <option key="PmntPromised" text="Promised"/>
+                                <option key="PmntAuthorized" text="Authorized"/>
+                                <option key="PmntDelivered" text="Delivered"/>
+                            </drop-down>
+                        </default-field></field>
+                        <field name="amountUomId" from="invoice.currencyUomId"><default-field title="Currency">
+                            <display-entity entity-name="moqui.basic.Uom"/></default-field></field>
+                        <field name="amount"><default-field>
+                            <text-line size="10" default-value="${ec.l10n.format(unpaidTotal, '#,##0.00')}"/>
+                        </default-field></field>
+                        <field name="paymentInstrumentEnumId"><default-field title="Payment Instrument">
+                            <widget-template-include location="component://webroot/template/screen/BasicWidgetTemplates.xml#enumDropDown">
+                                <set field="enumTypeId" value="PaymentInstrument"/>
+                                <set field="noCurrentSelectedKey" value="PiCompanyCheck"/></widget-template-include>
+                        </default-field></field>
+                        <field name="paymentMethodId"><default-field title="From Payment Method">
+                            <drop-down allow-empty="true"><entity-options key="${paymentMethodId}" text="PaymentMethodAndTypeTemplate">
+                                <entity-find entity-name="mantle.account.method.PaymentMethodAndType">
+                                    <econdition field-name="ownerPartyId" from="invoice.toPartyId"/>
+                                    <order-by field-name="typeDescription,description"/>
+                                </entity-find>
+                            </entity-options></drop-down>
+                        </default-field></field>
+                        <field name="effectiveDate" from="ec.user.nowTimestamp"><default-field><date-time/></default-field></field>
+                        <field name="paymentRefNum"><default-field title="Ref/Check Number"><text-line size="10"/></default-field></field>
+                        <field name="memo"><default-field><text-line size="30"/></default-field></field>
+                        <field name="comments"><default-field><text-area cols="60" rows="4"/></default-field></field>
+                        <field name="submitButton"><default-field title="Record Payment"><submit/></default-field></field>
+                    </form-single>
+                </container-dialog>
+            </box-toolbar><box-body>
+                <label text="Applied Payments ${ec.l10n.formatCurrency(appliedPaymentsTotal, invoice.currencyUomId)}, Unpaid ${ec.l10n.formatCurrency(unpaidTotal, invoice.currencyUomId)}" type="strong"/>
+            </box-body><box-body-nopad>
+                <form-list name="PaymentApplicationList" list="paymentApplicationList" skip-form="true">
+                    <row-actions>
+                        <set field="otherInvoiceId" from="toInvoiceId ? (toInvoiceId == invoice.invoiceId ? invoiceId : toInvoiceId) : null"/>
+                        <if condition="otherInvoiceId"><then>
+                            <entity-find-one entity-name="mantle.account.invoice.Invoice" value-field="otherInvoice">
+                                <field-map field-name="invoiceId" from="otherInvoiceId"/>
+                                <select-field field-name="statusId,referenceNumber"/>
+                            </entity-find-one>
+                        </then><else>
+                            <entity-find-one entity-name="mantle.account.payment.Payment" value-field="payment">
+                                <field-map field-name="paymentId"/><select-field field-name="statusId,paymentRefNum"/></entity-find-one>
+                        </else></if>
+                    </row-actions>
+                    <field name="paymentApplicationId"><default-field title="Appl"><display/></default-field></field>
+                    <field name="paymentId"><default-field title="Payment">
+                        <link url="editPayment" text="${paymentId}" link-type="anchor" condition="paymentId"/></default-field></field>
+                    <field name="otherInvoiceId"><default-field title="Other Invc">
+                        <link url="." text="${otherInvoiceId}" link-type="anchor" condition="otherInvoiceId"
+                                parameter-map="[invoiceId:otherInvoiceId]"/>
+                    </default-field></field>
+                    <field name="amountApplied" align="right"><default-field title="Amount"><display currency-unit-field="invoice.currencyUomId"/></default-field></field>
+                    <field name="appliedDate"><default-field title="Applied"><display/></default-field></field>
+                    <field name="statusId" from="payment?.statusId ?: otherInvoice?.statusId"><default-field title="Status">
+                        <display-entity entity-name="moqui.basic.StatusItem"/></default-field></field>
+                    <field name="refNum" from="payment?.paymentRefNum ?: otherInvoice?.referenceNumber"><default-field title="Ref/Check"><display/></default-field></field>
+                    <field name="unapply"><default-field title=""><link url="unapplyPaymentApplication" text="Un-apply" condition="amountApplied"
+                            confirmation="This will reduce the amount paid (applied) on this invoice possibly changing it back to an un-paid status, reverse the payment application GL transaction, and free up the payment to be applied to another invoice. Un-apply payment?"/></default-field></field>
+                </form-list>
+            </box-body-nopad></container-box>
+
+            <section name="RecordPaymentSection" condition="canRecordPayments"><widgets>
+                <container-box><box-header title="Promised Order Payments"/><box-body-nopad>
+                    <form-list name="OrderPromisedPaymentList" list="orderPromisedPaymentList" transition="sendPromisedPayment">
+                        <field name="invoiceId"><default-field><hidden/></default-field></field>
+                        <field name="orderId"><default-field title="Order">
+                            <link url="orderDetail" text="${orderId?:''}" link-type="anchor"/></default-field></field>
+                        <field name="paymentId"><default-field title="Payment">
+                            <display text=""/><link url="editPayment" text="${paymentId?:''}" link-type="anchor"/></default-field></field>
+                        <field name="amount" align="right"><default-field title="Amount"><text-line size="8" format="#,##0.00"/></default-field></field>
+                        <field name="paymentRefNum"><default-field title="Ref Num"><text-line size="8"/></default-field></field>
+                        <field name="submitButton"><default-field title="Send &amp; Apply"><submit/></default-field></field>
+                    </form-list>
+                </box-body-nopad></container-box>
+            </widgets></section>
+            <section name="ApplyPaymentSection" condition="canRecordPayments"><widgets>
+                <container-box><box-header title="Applicable Payments"/><box-body-nopad>
+                    <form-list name="UnappliedPaymentList" list="unappliedPaymentInfoList" transition="applyInvoicePayment">
+                        <field name="invoiceId"><default-field><hidden/></default-field></field>
+                        <field name="paymentId" from="payment.paymentId"><default-field title="Payment">
+                            <display text=""/><!-- so that it is rendered, and a hidden value is added -->
+                            <link url="editPayment" text="${payment.paymentId?:''}" link-type="anchor"
+                                  parameter-map="[paymentId:payment.paymentId]"/>
+                        </default-field></field>
+                        <field name="effectiveDate" from="payment.effectiveDate"><default-field title="Date">
+                            <display format="yyyy-MM-dd"/></default-field></field>
+                        <field name="statusId" from="payment.statusId"><default-field title="Status">
+                            <display-entity entity-name="moqui.basic.StatusItem" also-hidden="false"/></default-field></field>
+                        <field name="forThis"><default-field title="For This">
+                            <display text="${payment.forInvoiceId == invoiceId ? 'Y' : 'N'}"/></default-field></field>
+                        <field name="paymentTotal" align="right"><default-field title="Amount">
+                            <display currency-unit-field="payment.amountUomId"/></default-field></field>
+                        <field name="unappliedTotal" align="right"><default-field title="Unapplied">
+                            <display currency-unit-field="payment.amountUomId"/></default-field></field>
+                        <field name="amount" from="maxApplicableAmount" align="right">
+                            <conditional-field condition="allowApply"><text-line size="8" format="0.00"/></conditional-field>
+                            <default-field title="Apply"><display currency-unit-field="invoice.currencyUomId"/></default-field>
+                        </field>
+                        <field name="submitButton"><conditional-field condition="allowApply" title="Apply"><submit/></conditional-field>
+                            <default-field title=""><display text=""/></default-field></field>
+                    </form-list>
+                </box-body-nopad></container-box>
+            </widgets></section>
+            <section name="ApplyToInvoiceSection" condition="canRecordPayments"><widgets>
+                <container-box><box-header title="Applicable Unpaid Invoices"/><box-body-nopad>
+                    <form-list name="UnpaidInvoiceList" list="unpaidInvoiceInfoList" transition="applyInvoiceToInvoice">
+                        <field name="invoiceId"><default-field><hidden/></default-field></field>
+                        <field name="toInvoiceId" from="invoice.invoiceId"><default-field title="Invoice">
+                            <display text=""/><!-- so that it is rendered, and a hidden value is added -->
+                            <link url="." text="${invoice.invoiceId?:''}" link-type="anchor"
+                                    parameter-map="[invoiceId:invoice.invoiceId]"/>
+                        </default-field></field>
+                        <field name="invoiceDate" from="invoice.invoiceDate"><default-field title="Date">
+                            <display format="yyyy-MM-dd"/></default-field></field>
+                        <field name="statusId" from="invoice.statusId"><default-field title="Status">
+                            <display-entity entity-name="moqui.basic.StatusItem" also-hidden="false"/></default-field></field>
+                        <field name="invoiceTotal" align="right"><default-field title="Total">
+                            <display currency-unit-field="invoice.currencyUomId"/></default-field></field>
+                        <field name="unpaidTotal" align="right"><default-field title="Unpaid">
+                            <display currency-unit-field="invoice.currencyUomId"/></default-field></field>
+                        <field name="amount" from="maxApplicableAmount" align="right">
+                            <conditional-field condition="allowApply"><text-line size="8" format="0.00"/></conditional-field>
+                            <default-field title="Amount"><display currency-unit-field="invoice.currencyUomId"/></default-field>
+                        </field>
+                        <field name="submitButton"><conditional-field title="Apply" condition="allowApply"><submit/></conditional-field>
+                            <default-field title=""><display text=""/></default-field></field>
+                    </form-list>
+                </box-body-nopad></container-box>
+            </widgets></section>
+
+            <section name="GlTransactionsSection"><actions>
+                <entity-find entity-name="mantle.ledger.transaction.AcctgTrans" list="acctgTransList">
+                    <econditions combine="or">
+                        <econdition field-name="invoiceId"/>
+                        <econdition field-name="toInvoiceId" from="invoiceId"/>
+                    </econditions>
+                    <order-by field-name="acctgTransId"/>
+                </entity-find>
+
+                <set field="unpostableStatus" from="invoice.statusId in ['InvoiceInProcess', 'InvoiceWriteOff', 'InvoiceIncoming', 'InvoiceReceived', 'InvoiceCancelled']"/>
+
+                <entity-find entity-name="mantle.ledger.transaction.AcctgTransAndEntryGlaSummary" list="entrySummaryList">
+                    <econditions combine="or">
+                        <econdition field-name="invoiceId"/>
+                        <econdition field-name="toInvoiceId" from="invoiceId"/>
+                    </econditions>
+                    <select-field field-name="glAccountId,accountCode,accountName,isDebit,glAccountClassEnumId,debitCreditFlag,amount"/>
+                </entity-find>
+                <set field="glaSummaryMap" from="[:]"/>
+                <iterate list="entrySummaryList" entry="entrySummary">
+                    <set field="curEntry" from="glaSummaryMap.get(entrySummary.glAccountId)"/>
+                    <if condition="curEntry == null">
+                        <set field="curEntry" from="entrySummary.getMap()"/>
+                        <script>glaSummaryMap.put(entrySummary.glAccountId, curEntry)</script>
+                    </if>
+                    <if condition="entrySummary.debitCreditFlag == 'D'"><then><set field="curEntry.debits" from="entrySummary.amount"/></then>
+                        <else><set field="curEntry.credits" from="entrySummary.amount"/></else></if>
+                    <set field="curEntry.cdDiff" from="entrySummary.isDebit == 'Y' ? (curEntry.debits?:0.0) - (curEntry.credits?:0.0) : (curEntry.credits?:0.0) - (curEntry.debits?:0.0)"/>
+                </iterate>
+                <!-- might as well include all, don't exclude 0 net balance:
+                <set field="glaSummaryList" from="[]"/>
+                <iterate list="glaSummaryMap.values()" entry="curEntry">
+                    <if condition="curEntry.cdDiff != 0.0"><script>glaSummaryList.add(curEntry)</script></if></iterate>
+                -->
+                <set field="glaSummaryList" from="new ArrayList(glaSummaryMap.values())"/>
+                <order-map-list list="glaSummaryList"><order-by field-name="accountCode"/></order-map-list>
+
+                <set field="glAccountCodeMask" from="ec.user.getPreference('GlAccountCodeMask')"/>
+                <set field="accountCodeFormatter" from="masker(glAccountCodeMask, '0')"/><!-- will be null if no mask -->
+            </actions><widgets>
+                <container-box><box-header title="GL Transactions"/><box-toolbar>
+                    <link url="postInvoice" text="Post Invoice" condition="!acctgTransList &amp;&amp; !unpostableStatus"
+                            confirmation="This will attempt to create and post a GL transaction for this invoice, and one for each invoice adjustment item if there are any. Post now?"/>
+                    <link url="repostInvoice" text="Re-post Invoice" condition="acctgTransList &amp;&amp; !unpostableStatus"
+                            confirmation="This will delete the current invoice and invoice adjustment transactions and post new ones based on the current state of the invoice. Re-post this invoice?"/>
+                </box-toolbar><box-body-nopad>
+                    <form-list name="InvoiceTxList" list="acctgTransList" skip-form="true">
+                        <row-actions>
+                            <service-call name="mantle.ledger.LedgerServices.calculate#AcctgTransTrialBalance"
+                                    in-map="[acctgTransId:acctgTransId]" out-map="context"/>
+                        </row-actions>
+
+                        <field name="acctgTransId"><default-field title="TX ID">
+                            <link url="editTransaction" text="${acctgTransId}" link-type="anchor"/></default-field></field>
+                        <field name="acctgTransTypeEnumId">
+                            <default-field title="TX Type"><display-entity entity-name="moqui.basic.Enumeration"/></default-field></field>
+                        <field name="paymentId"><default-field title="Payment">
+                            <link url="editPayment" text="${paymentId}" link-type="anchor" condition="paymentId"/></default-field></field>
+
+                        <field name="reversedByAcctgTransId"><default-field title="Rev By">
+                            <link url="editTransaction" text="${reversedByAcctgTransId}" link-type="anchor" condition="reversedByAcctgTransId"
+                                    parameter-map="[acctgTransId:reversedByAcctgTransId]"/></default-field></field>
+                        <field name="reverseOfAcctgTransId"><default-field title="Rev Of">
+                            <link url="editTransaction" text="${reverseOfAcctgTransId}" link-type="anchor" condition="reverseOfAcctgTransId"
+                                    parameter-map="[acctgTransId:reverseOfAcctgTransId]"/></default-field></field>
+
+                        <field name="transactionDate"><default-field title="TX Date"><display format="yyyy-MM-dd"/></default-field></field>
+                        <field name="isPosted"><default-field title="Posted" container-style="${isPosted == 'Y' ? 'text-success' : 'text-danger'}"><display/></default-field></field>
+                        <field name="postedDate"><default-field><display format="yyyy-MM-dd"/></default-field></field>
+
+                        <field name="debitTotal" align="right"><default-field title="Total"><display currency-unit-field="amountUomId"/></default-field></field>
+                    </form-list>
+                    <form-list name="InvoiceGlaList" list="glaSummaryList" skip-form="true">
+                        <field name="glAccountId"><conditional-field condition="glAccountId"><display text="GlAccountNameTemplate"/></conditional-field>
+                            <default-field title="GL Account"><display text=" "/></default-field></field>
+                        <field name="debits" align="right" show-total="true"><default-field container-style="${(!glAccountId &amp;&amp; credits != debits) ? 'text-danger' : ''}">
+                            <display format="#,##0.00"/></default-field></field>
+                        <field name="credits" align="right" show-total="true"><default-field container-style="${(!glAccountId &amp;&amp; credits != debits) ? 'text-danger' : ''}">
+                            <display format="#,##0.00"/></default-field></field>
+                        <field name="cdDiff" align="right"><default-field title="Total" container-style="${(unpaidTotal != cdDiff &amp;&amp; glAccountClassEnumId in ['ACCOUNTS_RECEIVABLE', 'ACCOUNTS_PAYABLE']) ? 'text-danger' : ''}">
+                            <display format="#,##0.00"/></default-field></field>
+                    </form-list>
+                </box-body-nopad></container-box>
+            </widgets></section>
+        </row-col></container-row>
     </widgets>
 </screen>

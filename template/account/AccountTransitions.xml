@@ -12,64 +12,138 @@ You should have received a copy of the CC0 Public Domain Dedication
 along with this software (see the LICENSE.md file). If not, see
 <http://creativecommons.org/publicdomain/zero/1.0/>.
 -->
-<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.0.xsd">
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd">
 
     <transition name="getGlAccountList">
+        <parameter name="organizationPartyId"/>
+        <parameter name="onlyPostingAllowed"/>
         <actions>
             <entity-find-one entity-name="mantle.ledger.account.GlAccount" value-field="glAccount">
                 <field-map field-name="glAccountId" from="term"/></entity-find-one>
-            <if condition="glAccount">
+            <if condition="glAccount"><then>
                 <set field="glaList" from="[glAccount]"/>
-
-                <else>
-                    <entity-find entity-name="mantle.ledger.account.GlAccount" list="glaList" limit="20">
-                        <econditions combine="or">
-                            <econdition field-name="glAccountId" operator="like" value="%${term}%" ignore-case="true"/>
-                            <econdition field-name="accountCode" operator="like" value="%${term}%" ignore-case="true"/>
-                            <econdition field-name="accountName" operator="like" value="%${term}%" ignore-case="true"/>
-                        </econditions>
-                        <select-field field-name="glAccountId,accountCode,accountName"/>
-                        <order-by field-name="accountCode"/>
-                    </entity-find>
-                </else>
-            </if>
+            </then><else>
+                <entity-find entity-name="mantle.ledger.account.GlAccountAndOrganization" list="glaList" limit="20">
+                    <econdition field-name="organizationPartyId" ignore-if-empty="true"/>
+                    <econdition field-name="disallowPosting" value="N" or-null="true" ignore="onlyPostingAllowed != 'true'"/>
+                    <econditions combine="or">
+                        <econdition field-name="glAccountId" operator="like" value="%${term}%" ignore-case="true"/>
+                        <econdition field-name="accountCode" operator="like" value="%${term}%" ignore-case="true"/>
+                        <econdition field-name="accountName" operator="like" value="%${term}%" ignore-case="true"/>
+                    </econditions>
+                    <select-field field-name="glAccountId,accountCode,accountName"/>
+                    <order-by field-name="accountCode"/>
+                </entity-find>
+            </else></if>
+            <set field="glAccountCodeMask" from="ec.user.getPreference('GlAccountCodeMask')"/>
+            <set field="accountCodeFormatter" from="masker(glAccountCodeMask, '0')"/><!-- will be null if no mask -->
             <script>
                 def outList = []
-                for (def gla in glaList) outList.add([value:gla.glAccountId, label:ec.resource.expand('GlAccountNameTemplate','',gla)])
+                for (gla in glaList) {
+                    Map glaMap = gla.getMap()
+                    // GlAccountNameTemplate uses accountCodeFormatter if present so no need for explicit mask
+                    outList.add([value:gla.glAccountId, label:ec.resource.expand('GlAccountNameTemplate','',glaMap)])
+                }
                 ec.web.sendJsonResponse(outList)
             </script>
         </actions>
         <default-response type="none"/>
     </transition>
-    <transition name="getOrgGlAccountList">
+    <!-- NOTE: getOrgGlAccountList deprecated, use getGlAccountList with organizationPartyId parameter -->
+    <transition name="getGlAccountListPaginated">
         <parameter name="organizationPartyId"/>
+        <parameter name="invoiceId"/>
+        <parameter name="onlyPostingAllowed"/>
+        <parameter name="pageIndex"/>
+        <parameter name="pageSize"/>
+        <parameter name="term"/>
         <actions>
-            <entity-find-one entity-name="mantle.ledger.account.GlAccountAndOrganization" value-field="glAccount">
-                <field-map field-name="organizationPartyId"/>
-                <field-map field-name="glAccountId" from="term"/></entity-find-one>
-            <if condition="glAccount">
-                <set field="glaList" from="[glAccount]"/>
+            <set field="glAccountCodeMask" from="ec.user.getPreference('GlAccountCodeMask')"/>
+            <set field="accountCodeFormatter" from="masker(glAccountCodeMask, '0')"/><!-- will be null if no mask -->
+            <set field="pageIndex" from="pageIndex ?: 0"/>
+            <set field="pageSize" from="pageSize ?: 20"/>
+            <set field="term" from="term ?: ''"/>
 
-                <else>
-                    <entity-find entity-name="mantle.ledger.account.GlAccountAndOrganization" list="glaList" limit="20">
-                        <econdition field-name="organizationPartyId"/>
-                        <econditions combine="or">
-                            <econdition field-name="glAccountId" operator="like" value="%${term}%" ignore-case="true"/>
-                            <econdition field-name="accountCode" operator="like" value="%${term}%" ignore-case="true"/>
-                            <econdition field-name="accountName" operator="like" value="%${term}%" ignore-case="true"/>
-                        </econditions>
-                        <select-field field-name="glAccountId,accountCode,accountName"/>
-                        <order-by field-name="accountCode"/>
-                    </entity-find>
-                    <!-- <log level="warn" message="========= organizationPartyId=${organizationPartyId}, term=${term}, glaList: ${glaList}"/> -->
-                </else>
+            <if condition="invoiceId &amp;&amp; !term">
+                <!-- get most frequently used override GL accounts for other party -->
+                <entity-find-one entity-name="mantle.account.invoice.Invoice" value-field="invoice"/>
+                <entity-find-count entity-name="mantle.party.PartyRole" count-field="fromOrgInternalCount">
+                    <econdition field-name="partyId" from="invoice.fromPartyId"/>
+                    <econdition field-name="roleTypeId" value="OrgInternal"/></entity-find-count>
+                <set field="isFromOrgInternal" from="fromOrgInternalCount &gt; 0"/>
+                <entity-find entity-name="mantle.account.invoice.InvoiceItemSummary" list="itemSummaryList" limit="20">
+                    <econdition field-name="fromPartyId" from="invoice.fromPartyId" ignore="isFromOrgInternal"/>
+                    <econdition field-name="toPartyId" from="invoice.toPartyId" ignore="!isFromOrgInternal"/>
+                    <econdition field-name="overrideGlAccountId" operator="is-not-null"/>
+                    <select-field field-name="overrideGlAccountId,quantityTotal"/><order-by field-name="-quantityTotal,overrideGlAccountId"/>
+                </entity-find>
+                <if condition="itemSummaryList">
+                    <set field="outList" from="[]"/>
+                    <iterate list="itemSummaryList" entry="itemSummary">
+                        <entity-find-one entity-name="mantle.ledger.account.GlAccount" value-field="glAccount" cache="true">
+                            <field-map field-name="glAccountId" from="itemSummary.overrideGlAccountId"/></entity-find-one>
+                        <script>outList.add([value:glAccount.glAccountId, label:ec.resource.expand('GlAccountNameTemplate','',glAccount.getMap())])</script>
+                    </iterate>
+                    <script>ec.web.sendJsonResponse([options:outList])</script>
+                    <return/>
+                </if>
             </if>
+
+            <entity-find-one entity-name="mantle.ledger.account.GlAccount" value-field="glAccount" cache="true">
+                <field-map field-name="glAccountId" from="term"/></entity-find-one>
+            <if condition="glAccount"><then>
+                <set field="glaList" from="[glAccount]"/>
+            </then><else>
+                <entity-find entity-name="mantle.ledger.account.GlAccountAndOrganization" list="glaList" cache="false">
+                    <search-form-inputs default-order-by="accountCode" skip-fields="disallowPosting"/>
+                    <!-- <econdition field-name="organizationPartyId" ignore-if-empty="true"/> -->
+                    <econdition field-name="disallowPosting" value="N" or-null="true" ignore="onlyPostingAllowed != 'true'"/>
+                    <econditions combine="or">
+                        <econdition field-name="glAccountId" operator="like" value="%${term}%" ignore-case="true"/>
+                        <econdition field-name="accountCode" operator="like" value="%${term}%" ignore-case="true"/>
+                        <econdition field-name="accountName" operator="like" value="%${term}%" ignore-case="true"/>
+                    </econditions>
+                    <select-field field-name="glAccountId,accountCode,accountName"/>
+                    <order-by field-name="accountCode"/>
+                </entity-find>
+            </else></if>
             <script>
                 def outList = []
-                for (def gla in glaList) outList.add([value:gla.glAccountId, label:ec.resource.expand('GlAccountNameTemplate','',gla)])
-                ec.web.sendJsonResponse(outList)
+                for (gla in glaList) {
+                    Map glaMap = gla.getMap()
+                    // GlAccountNameTemplate uses accountCodeFormatter if present so no need for explicit mask
+                    outList.add([value:gla.glAccountId, label:ec.resource.expand('GlAccountNameTemplate','',glaMap)])
+                }
+                ec.web.sendJsonResponse([options:outList, pageSize:pageSize, count:(glaListCount?:glaList.size())])
             </script>
+        </actions>
+        <default-response type="none"/>
+    </transition>
+
+    <transition name="getOrganizationFiscalTimePeriods">
+        <parameter name="term"/>
+        <actions>
+            <service-call name="mantle.ledger.LedgerServices.get#OrganizationFiscalTimePeriods" out-map="context" in-map="context"/>
+            <order-map-list list="timePeriodList"><order-by field-name="-thruDate,-timePeriodTypeId"/></order-map-list>
+            <script>ec.web.sendJsonResponse(timePeriodList)</script>
+        </actions>
+        <default-response type="none"/>
+    </transition>
+
+    <transition name="getItemTypeGlAccount">
+        <parameter name="itemTypeEnumId"/><parameter name="productId"/>
+        <parameter name="organizationPartyId"/><parameter name="direction"/>
+        <actions>
+            <if condition="!itemTypeEnumId || !organizationPartyId || !direction">
+                <script>ec.web.sendTextResponse("No GL Account mapping found")</script><return/></if>
+
+            <service-call name="mantle.ledger.InvoiceAutoPostServices.get#InvoiceItemGlAccount" out-map="glAccountOut"
+                    in-map="[organizationPartyId:organizationPartyId, itemTypeEnumId:itemTypeEnumId, productId:productId, direction:direction]"/>
+            <if condition="glAccountOut.glAccount"><then>
+                <set field="glAccountCodeMask" from="ec.user.getPreference('GlAccountCodeMask')"/>
+                <set field="accountCodeFormatter" from="masker(glAccountCodeMask, '0')"/><!-- will be null if no mask -->
+                <script>ec.web.sendTextResponse(ec.resource.expand("GlAccountNameTemplate", '', glAccountOut.glAccount.getMap()))</script>
+            </then><else><script>ec.web.sendTextResponse("No GL Account mapping found")</script></else></if>
         </actions>
         <default-response type="none"/>
     </transition>
