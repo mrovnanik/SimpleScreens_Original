@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+This software is in the public domain under CC0 1.0 Universal plus a
+Grant of Patent License.
+
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software (see the LICENSE.md file). If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
+<screen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://moqui.org/xsd/xml-screen-2.1.xsd"
+        default-menu-include="false">
+
+    <transition name="loadEnumeratorData" read-only="true">
+        <parameter name="enumTypeId"/>
+
+        <actions>
+            <entity-find entity-name="moqui.basic.Enumeration" list="enumData">
+                <econdition field-name="enumTypeId" from="enumTypeId"/>
+            </entity-find>
+
+            <set field="output" from="[]"/>
+
+            <script>
+                <![CDATA[
+                    if (enumData) {
+                        for (EntityValue ei in enumData) {
+                            def eiv = [:]
+
+                            eiv.put("enumId", ei.enumId)
+                            eiv.put("description", ei.description)
+
+                            output.add(eiv)
+                        }
+                    }
+
+                    ec.web.sendJsonResponse(output)
+                ]]>
+            </script>
+        </actions>
+
+        <default-response type="none"/>
+    </transition>
+
+    <widgets/>
+</screen>
